@@ -52,6 +52,7 @@
 #include "test.h"
 #include "SLIC.h"
 #include "util.h"
+#include "ICM.h"
 #define lim0 1.5
 
 #define WM_BASE 10000

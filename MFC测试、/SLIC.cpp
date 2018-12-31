@@ -39,9 +39,12 @@ int SLIC(CImage &res,CImage &des,int k,double M)
 	AfxMessageBox(str);*/
 
 	Image2Lab(des,lab);
+	Avg_n2(lab,width,height,3);
 	GetImageGrad(lab,grad,width,height);
 	SLIC_Core(lab,grad,fenClass_c,width,height,k,M);
 	MergeClassByColor(lab,fenClass_c,width,height,k);
 	DrawBorder1(des,fenClass_c,width,height);
+	//DrawBorderWithColor(des,fenClass_c,k,width,height);
+	//DrawBorderOnlyLine(des,fenClass_c,width,height);
 	return 0;
 }

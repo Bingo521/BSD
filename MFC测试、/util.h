@@ -85,6 +85,8 @@ void MergeClassByAngle(const vector<vector<vector<float>>> &lab,vector<vector<in
 void DrawBorder(CImage &des,vector<vector<int>> &fenClass_c);
 void DrawBorder1(CImage &des,vector<vector<int>> &fenClass_c);
 void DrawBorder1(CImage &des,vector<int> &fenClass_c,int width,int height);
+void DrawBorderWithColor(CImage &des,vector<int> &fenClass_c,int k,int width,int height);
+void DrawBorderOnlyLine(CImage &des,vector<int> &fenClass_c,int width,int height);
 void GMM_Core(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
 				vector<int> & point_num,
@@ -107,3 +109,9 @@ void KMeans_Core(	const vector<vector<vector<float>>> &lab,
 					int &k,
 					double M);
 double GetAngle(double ax,double ay,double bx,double by);
+void ICM_Core(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k);
+void Avg_n2(vector<vector<float>> & lab,int width,int height,int n);

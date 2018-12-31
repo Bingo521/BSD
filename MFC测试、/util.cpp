@@ -1201,7 +1201,7 @@ void MergeClassByColor(const vector<vector<float>> &lab,vector<int> &fenClass_c,
 				}
 			}
 
-			if(abs(maxx - minx - maxy + miny) < MinDisY)
+			//if(abs(maxx - minx - maxy + miny) < MinDisY)
 			{
 				Tag &tag = new_class[c];
 				int &c_num = new_class_num[c];
@@ -1803,6 +1803,110 @@ void DrawBorder1(CImage &des,vector<int> &fenClass_c,int width,int height)
 	}
 }
 
+void DrawBorderWithColor(CImage &des,vector<int> &fenClass_c,int k,int width,int height)
+{
+	int sz = width * height;
+	int Move[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	int cou = 0;
+	int main_taken = 0;
+	byte * blt = (byte *)des.GetBits();
+	int plt = des.GetPitch();
+	vector<vector<byte>> color(3,vector<byte>(sz));
+	srand(time(NULL));
+	for(int i = 0 ; i < sz ; i ++)
+	{
+		color[0][i] = rand() % 256;
+		color[1][i] = rand() % 256;
+		color[2][i] = rand() % 256;
+	}
+	for(int i = 0 ;i<width ; i++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			int pos = i * height + j;
+			*(blt + plt*j+ i*3) = color[0][fenClass_c[pos]];
+			*(blt + plt*j+ i*3 + 1) = color[1][fenClass_c[pos]];
+			*(blt + plt*j+ i*3 + 2) = color[2][fenClass_c[pos]];
+		}
+	}
+}
+void DrawBorderOnlyLine(CImage &des,vector<int> &fenClass_c,int width,int height)
+{
+	int sz = width * height;
+	int Move[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	vector<int> contourx(sz);
+	vector<int> contoury(sz);
+	vector<bool> is_taken(sz,false);
+	int cou = 0;
+	int main_taken = 0;
+	byte * blt = (byte *)des.GetBits();
+	int plt = des.GetPitch();
+	for(int i=0;i<width;i++)
+	{
+		for(int j=0;j<height;j++)
+		{
+			bool isWhite = false;
+			int nup(0);
+			int pos = i * height + j;
+			for(int w=0;w<8;w++)
+			{
+				int nx = i+Move[w][0];
+				int ny = j+Move[w][1];
+				if(nx<0 || ny<0 || nx>= width || ny>=height)
+				{
+					continue;
+				}
+				int npos = nx * height + ny;
+				if(fenClass_c[pos]!=fenClass_c[npos])
+				{
+					nup ++;
+				}
+			}
+			if(nup > 1)
+			{
+				contourx[cou] = i;
+				contoury[cou] = j;
+				is_taken[main_taken] = true;
+				cou ++;
+			}
+			main_taken ++;
+		}
+	}
+	//Ⱦɫ
+	for(int i = 0 ; i < width ; i++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			*(blt + plt*j+ i*3) = 0xff;
+			*(blt + plt*j+ i*3 + 1) = 0xff;
+			*(blt + plt*j+ i*3 + 2) = 0xff;
+		}
+	}
+	for(int i = 0 ;i<cou ; i++)
+	{
+		int pos = contourx[i] * height + contoury[i] ;
+		*(blt + plt*contoury[i]+ contourx[i]*3) = 0xff;
+		*(blt + plt*contoury[i]+ contourx[i]*3 + 1) = 0xff;
+		*(blt + plt*contoury[i]+ contourx[i]*3 + 2) = 0xff;
+		for(int j = 0 ; j < 8 ; j ++)
+		{
+			int nx = contourx[i] + Move[j][0];
+			int ny = contoury[i] + Move[j][1];
+			
+			if(nx<0 || ny<0 || nx>= width || ny>=height)
+			{
+				continue;
+			}
+			int npos = nx * height + ny;
+			if(!is_taken[npos])
+			{
+				*(blt + plt*ny + nx*3) = 0;
+				*(blt + plt*ny + nx*3 + 1) = 0;
+				*(blt + plt*ny + nx*3 + 2) = 0;
+			}
+		}
+	}
+}
 void GMM_Core(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
 				vector<int> & point_num,
@@ -2414,3 +2518,233 @@ void KMeans_Core(	const vector<vector<vector<float>>> &lab,
 		}
 	}
 }
+
+void ICM_Core(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k)
+{
+	int label_num = 5;
+	int T = 1.5;
+	int label_num2 = label_num * label_num;
+	int sz = width * height;
+	vector<vector<double>> E(k,vector<double>(label_num,0));
+	vector<vector<double>> D(k,vector<double>(label_num2,0));
+	vector<int> c_num(k,0);
+	vector<double>e(label_num);
+	vector<double>t(label_num);
+	vector<double>d(label_num2);
+	vector<int> fenClass_t(sz);
+	vector<double> ans(1);
+	for(int i = 0 ; i < width ; i ++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			int pos = i * height + j;
+			int c = fenClass_c[pos];
+			E[c][0] += lab[0][c];
+			E[c][1] += lab[1][c];
+			E[c][2] += lab[2][c];
+			E[c][3] += i;
+			E[c][4] += j;
+			c_num[c] ++;
+		}
+	}
+	for(int i = 0 ; i < k ; i ++)
+	{
+		if(c_num[i] == 0)
+			continue;
+		E[i][0] /= c_num[i];
+		E[i][1] /= c_num[i];
+		E[i][2] /= c_num[i];
+		E[i][3] /= c_num[i];
+		E[i][4] /= c_num[i];
+	}
+	for(int i = 0 ; i < width ; i ++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			int pos = i * height + j;
+			int c = fenClass_c[pos];
+			e[0] = lab[0][c] - E[c][0];
+			e[1] = lab[1][c] - E[c][1];
+			e[2] = lab[2][c] - E[c][2];
+			e[3] = i - E[c][3];
+			e[4] = j - E[c][4];
+			Muti_Matrix(e,e,label_num,1,label_num,d);
+			for(int w = 0 ; w < label_num2 ;w ++)
+			{
+				D[c][w] += d[w];
+			}
+		}
+	}
+	for(int i = 0 ; i < k ; i ++)
+	{
+		if(c_num[i] == 0)
+			continue;
+		for(int w = 0 ; w < label_num2; w++)
+		{
+			D[i][w] /= c_num[i];
+		}
+	}
+	int Max_Time = 10;
+	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	vector<int> num(k,0);
+	vector<double> P(k);
+	int s_8[8];
+	int spos = 0;
+	CMatrix matrix(label_num);
+	while(Max_Time -- )
+	{
+		for(int i = 0 ; i < sz ; i++)
+			fenClass_t[i] = fenClass_c[i];
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_t[pos];
+				for(int w = 0 ; w < 8 ; w++)
+				{
+					int nx = i + Move8[w][0];
+					int ny = j + Move8[w][1];
+					int npos = nx * height + ny;
+					if(npos <0 || npos >=sz)
+						continue;
+					if(num[fenClass_t[npos]] == 0)
+					{
+						s_8[spos] = fenClass_t[npos];
+						spos ++;
+					}
+					num[fenClass_t[npos]] ++;
+				}
+				double z = 0;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					int tnum = num[s_8[w]];
+					int b = tnum + tnum - 8;
+					P[s_8[w]] = exp(-1.0 * b / T);
+					z += P[s_8[w]];
+				}
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					P[s_8[w]] /= z;
+				}
+				int tc = c;
+				int max_pi = -1;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					int c = s_8[w];
+					double dv = matrix.inverse(D[c]);
+					if(dv == 0)
+						continue;
+					d[0] = lab[0][pos] - E[c][0];
+					d[1] = lab[1][pos] - E[c][1];
+					d[2] = lab[2][pos] - E[c][2];
+					d[3] = i - E[c][3];
+					d[4] = j - E[c][4];
+					Muti_Matrix(d,matrix.m_matrix,1,label_num,label_num,t);
+					Muti_Matrix(t,d,1,label_num,1,ans);
+					double pi = P[c] / pow(2*Pi,2.5) / sqrt(dv) *exp(-0.5 * ans[0]);  
+					if(pi > max_pi)
+					{
+						tc = c;
+						max_pi = pi;
+					}
+				}
+				fenClass_c[pos] = tc;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					num[s_8[w]] = 0;
+				}
+				spos = 0;
+			}
+		}
+	}
+	
+}
+
+void Avg_n2(vector<vector<float>> & lab,int width,int height,int n)
+{
+	int sz = width * height;
+	int len = lab.size();
+	vector<vector<float>> lab2(3,vector<float>(sz));
+
+	lab2[0][0] = lab[0][0];
+	lab2[1][0] = lab[1][0];
+	lab2[2][0] = lab[2][0];
+	for(int i = 1 ; i < width ; i++)
+	{
+		int pos = i * height;
+		int pos_ = pos - height;
+		lab2[0][pos] = lab[0][pos] + lab2[0][pos_];
+		lab2[1][pos] = lab[1][pos] + lab2[1][pos_];
+		lab2[2][pos] = lab[2][pos] + lab2[2][pos_];
+	}
+	for(int i = 1 ; i < height ; i++)
+	{
+		lab2[0][i] = lab[0][i] + lab2[0][i-1];
+		lab2[1][i] = lab[1][i] + lab2[1][i-1];
+		lab2[2][i] = lab[2][i] + lab2[2][i-1];
+	}
+	for(int i = 1 ; i < width ; i++)
+	{
+		for(int j = 1; j < height ; j++)
+		{
+			int pos = i * height + j;
+			int pos1 = pos - height;
+			int pos2 = pos - 1;
+			int pos3 = pos1 - 1;
+			lab2[0][pos] = lab[0][pos] + lab2[0][pos1] + lab2[0][pos2] - lab2[0][pos3];
+			lab2[1][pos] = lab[1][pos] + lab2[1][pos1] + lab2[1][pos2] - lab2[1][pos3];
+			lab2[2][pos] = lab[2][pos] + lab2[2][pos1] + lab2[2][pos2] - lab2[2][pos3];
+		}
+	}
+	for(int i = 0; i < width ; i++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			int min_x = max(0, i - n );
+			int min_y = max(0, j - n);
+			int max_x = min(i + n, width-1);
+			int max_y = min(j + n, height -1);
+			min_x --;
+			min_y --;
+			int pos = i * height + j;
+			int pos1 = min_x * height + min_y;
+			int pos2 = max_x * height + max_y;
+			int pos3 = min_x * height + max_y;
+			int pos4 = max_x * height + min_y;
+			int lensz = (max_x - min_x) * (max_y - min_y);
+			if(min_x >=0 && min_y >=0)
+			{
+				lab[0][pos] = lab2[0][pos2] + lab2[0][pos1] - lab2[0][pos3] - lab2[0][pos4];
+				lab[1][pos] = lab2[1][pos2] + lab2[1][pos1] - lab2[1][pos3] - lab2[1][pos4];
+				lab[2][pos] = lab2[2][pos2] + lab2[2][pos1] - lab2[2][pos3] - lab2[2][pos4];
+			}
+			else if(min_x <0 && min_y < 0)
+			{
+				lab[0][pos] = lab2[0][pos2] ;
+				lab[1][pos] = lab2[1][pos2] ;
+				lab[2][pos] = lab2[2][pos2] ;
+			}
+			else if(min_x < 0)
+			{
+				lab[0][pos] = lab2[0][pos2] - lab2[0][pos4];
+				lab[1][pos] = lab2[1][pos2] - lab2[1][pos4];
+				lab[2][pos] = lab2[2][pos2] - lab2[2][pos4];
+			}
+			else 
+			{
+				lab[0][pos] = lab2[0][pos2] - lab2[0][pos3];
+				lab[1][pos] = lab2[1][pos2] - lab2[1][pos3];
+				lab[2][pos] = lab2[2][pos2] - lab2[2][pos3];
+			}
+			lab[0][pos] /= lensz;
+			lab[1][pos] /= lensz;
+			lab[2][pos] /= lensz;
+		}
+	}
+}
+
