@@ -65,6 +65,8 @@
 #define INFI 0x3f3f3f3f
 #define INFLL  9223372036854775807
 
+#define LABEL_NUM 5
+#define LABEL_NUM2 25
 const double Pi = acos(-1);
 #ifdef _UNICODE
 #if defined _M_IX86

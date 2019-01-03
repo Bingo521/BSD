@@ -1,226 +1,6 @@
 #include "stdafx.h"
 using namespace std;
-struct L_Tag
-{
-	TagEx taga;
-	Tag tagb;
-};
-struct DPoint{
-	double x;
-	double y;
-	int num;
-	DPoint()
-	{
-		x = 0;
-		y = 0;
-		num = 0;
-	}
-	DPoint(double x,double y,int num)
-	{
-		this->x = x;
-		this->y = y;
-		this->num = num;
-	}
-};
 
-/*
-CMatrix为计算出逆矩阵的类，初始化传入一个参数n为n*n矩阵，用inverse
-*/
-class CMatrix
-{
-public:
-    int n;
-    vector<double> m_matrix;
-    vector<double> bb;
-    vector<double> adjoint;
-    CMatrix(int n)
-    {
-        this->n = n;
-		m_matrix = vector<double>(n * n);
-		bb = vector<double>((n -1) * (n - 1));
-		adjoint = vector<double>(n * n);
-    }
-    double det(int n,double *aa)
-    {
-        if (n == 1)
-            return aa[0];
-        int mov = 0;//判断行是否移动
-        double sum = 0.0;//sum为行列式的值
-        for (int arow = 0; arow<n; arow++) // a的行数把矩阵a(nn)赋值到b(n-1)
-        {
-            for (int brow = 0; brow<n - 1; brow++)//把aa阵第一列各元素的代数余子式存到bb
-            {
-                mov = arow > brow ? 0 : 1; //bb中小于arow的行，同行赋值，等于的错过，大于的加一
-                for (int j = 0; j<n - 1; j++)  //从aa的第二列赋值到第n列
-                {
-                    bb[brow*(n - 1) + j] = aa[(brow + mov)*n + j + 1];
-                }
-            }
-            int flag = (arow % 2 == 0 ? 1: -1);//因为列数为0，所以行数是偶数时候，代数余子式为1.
-            sum += flag* aa[arow*n] * det(n - 1, bb);//aa第一列各元素与其代数余子式积的和即为行列式
-        }
-        return sum;
-    }
-    double inverse(double *aa)
-    {
-        double det_aa = det(n,aa);
-        if (det_aa == 0)
-        {
-            return 0;
-        }
-        int pi, pj, q;
-        for (int ai = 0; ai<n; ai++) // a的行数把矩阵a(nn)赋值到b(n-1)
-        {
-            for (int aj = 0; aj<n; aj++)
-            {
-                for (int bi = 0; bi<n - 1; bi++)//把元素aa[ai][0]代数余子式存到bb[][]
-                {
-                    for (int bj = 0; bj<n - 1; bj++)//把元素aa[ai][0]代数余子式存到bb[][]
-                    {
-                        if (ai>bi)    //ai行的代数余子式是：小于ai的行，aa与bb阵，同行赋值
-                            pi = 0;
-                        else
-                            pi = 1;     //大于等于ai的行，取aa阵的ai+1行赋值给阵bb的bi行
-                        if (aj>bj)    //ai行的代数余子式是：小于ai的行，aa与bb阵，同行赋值
-                            pj = 0;
-                        else
-                            pj = 1;     //大于等于ai的行，取aa阵的ai+1行赋值给阵bb的bi行
-
-                        bb[bi*(n - 1) + bj] = aa[(bi + pi)*n + bj + pj];
-                    }
-                }
-                if ((ai + aj) % 2 == 0)  q = 1;//因为列数为0，所以行数是偶数时候，代数余子式为-1.
-                else  q = (-1);
-                adjoint[ai*n + aj] = q*det(n - 1, bb);
-            }
-        }
-        for(int i = 0; i < n; i++)//adjoint 转置
-        {
-            for(int j = 0; j < i; j++)
-            {
-                double tem = adjoint[i*n + j];
-                adjoint[i*n + j] =  adjoint[j*n + i];
-                adjoint[j*n + i] =  tem;
-            }
-        }
-        for (int i = 0; i < n; i++) //打印逆矩阵
-        {
-            for (int j = 0; j < n; j++)
-            {
-                m_matrix[i * n + j] = adjoint[i*n + j] / det_aa;
-            }
-        }
-        return det_aa;
-    }
-	double det(int n,const vector<double> &aa)
-    {
-        if (n == 1)
-            return aa[0];
-        int mov = 0;//判断行是否移动
-        double sum = 0.0;//sum为行列式的值
-        for (int arow = 0; arow<n; arow++) // a的行数把矩阵a(nn)赋值到b(n-1)
-        {
-            for (int brow = 0; brow<n - 1; brow++)//把aa阵第一列各元素的代数余子式存到bb
-            {
-                mov = arow > brow ? 0 : 1; //bb中小于arow的行，同行赋值，等于的错过，大于的加一
-                for (int j = 0; j<n - 1; j++)  //从aa的第二列赋值到第n列
-                {
-                    bb[brow*(n - 1) + j] = aa[(brow + mov)*n + j + 1];
-                }
-            }
-            int flag = (arow % 2 == 0 ? 1: -1);//因为列数为0，所以行数是偶数时候，代数余子式为1.
-            sum += flag* aa[arow*n] * det(n - 1, bb);//aa第一列各元素与其代数余子式积的和即为行列式
-        }
-        return sum;
-    }
-    double inverse(const vector<double> &aa)
-    {
-        double det_aa = det(n,aa);
-        if (det_aa == 0)
-        {
-            return 0;
-        }
-        int pi, pj, q;
-        for (int ai = 0; ai<n; ai++) // a的行数把矩阵a(nn)赋值到b(n-1)
-        {
-            for (int aj = 0; aj<n; aj++)
-            {
-                for (int bi = 0; bi<n - 1; bi++)//把元素aa[ai][0]代数余子式存到bb[][]
-                {
-                    for (int bj = 0; bj<n - 1; bj++)//把元素aa[ai][0]代数余子式存到bb[][]
-                    {
-                        if (ai>bi)    //ai行的代数余子式是：小于ai的行，aa与bb阵，同行赋值
-                            pi = 0;
-                        else
-                            pi = 1;     //大于等于ai的行，取aa阵的ai+1行赋值给阵bb的bi行
-                        if (aj>bj)    //ai行的代数余子式是：小于ai的行，aa与bb阵，同行赋值
-                            pj = 0;
-                        else
-                            pj = 1;     //大于等于ai的行，取aa阵的ai+1行赋值给阵bb的bi行
-
-                        bb[bi*(n - 1) + bj] = aa[(bi + pi)*n + bj + pj];
-                    }
-                }
-                if ((ai + aj) % 2 == 0)  q = 1;//因为列数为0，所以行数是偶数时候，代数余子式为-1.
-                else  q = (-1);
-                adjoint[ai*n + aj] = q*det(n - 1, bb);
-            }
-        }
-        for(int i = 0; i < n; i++)//adjoint 转置
-        {
-            for(int j = 0; j < i; j++)
-            {
-                double tem = adjoint[i*n + j];
-                adjoint[i*n + j] =  adjoint[j*n + i];
-                adjoint[j*n + i] =  tem;
-            }
-        }
-        for (int i = 0; i < n; i++) //打印逆矩阵
-        {
-            for (int j = 0; j < n; j++)
-            {
-                m_matrix[i * n + j] = adjoint[i*n + j] / det_aa;
-            }
-        }
-        return det_aa;
-    }
-};
-void Add_Matrix(vector<double> &a,vector<double> &b)
-{
-	int n = a.size();
-	for(int i = 0; i < n ; i ++)
-	{
-		a[i] += b[i];
-	}
-}
-void Sub_Matrix(vector<double> &c,const vector<double> &a,const vector<double> &b)
-{
-	int n = a.size();
-	for(int i = 0; i < n ; i ++)
-	{
-		c[i] = a[i] - b[i];
-	}
-}
-void Muti_Matrix(vector<double> &a,vector<double> &b,int m,int n,int k,vector<double> &c)
-{
-	double * tmp = new double[k];
-	for(int i = 0; i < m ; i++)
-	{
-		for(int j = 0 ; j < k ; j ++)
-		{
-			tmp[j] = 0;
-			for(int w = 0 ; w < n ; w ++)
-			{
-				tmp[j]+= a[i * n + w] * b[w * n + j];
-			}
-		}
-		for(int j = 0 ; j < k ; j ++)
-		{
-			c[i*k+j] = tmp[j];
-		}
-	}
-	delete []tmp;
-}
 double GetAngle(double ax,double ay,double bx,double by)
 {
     double tt,kk,sum;
@@ -1201,7 +981,7 @@ void MergeClassByColor(const vector<vector<float>> &lab,vector<int> &fenClass_c,
 				}
 			}
 
-			//if(abs(maxx - minx - maxy + miny) < MinDisY)
+			if(abs(maxx - minx - maxy + miny) < MinDisY)
 			{
 				Tag &tag = new_class[c];
 				int &c_num = new_class_num[c];
@@ -1915,8 +1695,8 @@ void GMM_Core(	const vector<vector<vector<float>>> &lab,
 	//int width = lab.size();
 	//int height  = lab[0].size();
 	//int pixel_num = width * height;
-	//int label_num = 5;
-	//int label_num2 = label_num *label_num;
+	//int LABEL_NUM = 5;
+	//int LABEL_NUM2 = LABEL_NUM *LABEL_NUM;
 	//vector<double> pi(k);
 	//vector<Tag> E(k);
 	//vector<vector<double>> D(k);
@@ -1929,7 +1709,7 @@ void GMM_Core(	const vector<vector<vector<float>>> &lab,
 	//}
 	//for(int i = 0 ; i < k ; i ++)
 	//{
-	//	_D_[i] = vector<double>(label_num2);
+	//	_D_[i] = vector<double>(LABEL_NUM2);
 	//}
 	//int MaxTime = 10;
 	//int S = (int)sqrt(pixel_num / k);
@@ -1944,7 +1724,7 @@ void GMM_Core(	const vector<vector<vector<float>>> &lab,
 	//		E[i].b = 0;
 	//		E[i].x = 0;
 	//		E[i].y = 0;
-	//		for(int j = 0; j < label_num2 ; j++)
+	//		for(int j = 0; j < LABEL_NUM2 ; j++)
 	//		{
 	//			_D_[i][j] = 0;
 	//		}
@@ -1969,7 +1749,7 @@ void GMM_Core(	const vector<vector<vector<float>>> &lab,
 	//	{
 	//		pi[i] = 1.0 * point_num[i] / pixel_num;
 	//	}
-	//	vector<double> tmp(label_num2);
+	//	vector<double> tmp(LABEL_NUM2);
 	//	for(int i = 0; i < width ; i++)
 	//	{
 	//		for(int j = 0;j < height ;j++)
@@ -1977,13 +1757,13 @@ void GMM_Core(	const vector<vector<vector<float>>> &lab,
 	//			int c = fenClass_c[i][j];
 	//			if(c == -1)
 	//				continue;
-	//			vector<double> row(label_num);
+	//			vector<double> row(LABEL_NUM);
 	//			row[0] = (lab[i][j][0] - E[c].r) * (lab[i][j][0] - E[c].r);
 	//			row[1] = (lab[i][j][1] - E[c].g) * (lab[i][j][1] - E[c].g);
 	//			row[2] = (lab[i][j][2] - E[c].b) * (lab[i][j][2] - E[c].b);
 	//			row[3] = (i - E[c].x) * (i - E[c].x);
 	//			row[4] = (j - E[c].y) * (j - E[c].y);
-	//			Muti_Matrix(row,row,label_num,1,label_num,tmp);
+	//			Muti_Matrix(row,row,LABEL_NUM,1,LABEL_NUM,tmp);
 	//			Add_Matrix(_D_[c],tmp);
 	//		}
 	//	}
@@ -2033,15 +1813,15 @@ void GMM_Core(	const vector<vector<float>> &lab,
 				int &k)
 {
 	int sz = width * height;
-	int label_num = 5;
-	int label_num2 = label_num * label_num;
+	const double powd = pow(2*Pi,LABEL_NUM / 2);
 	vector<vector<double>> pi(k,vector<double>(sz));
-	vector<vector<double>> D(k,vector<double>(label_num2,0));
-	vector<vector<double>> E(k,vector<double>(label_num,0));
+	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
+	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
 	vector<double> P(k,0);
-	vector<vector<double>> k_tags(k,vector<double>(label_num,0));
+	vector<vector<double>> k_tags(k,vector<double>(LABEL_NUM,0));
 	vector<int> k_tags_num(k,0);
-
+	CMatrix matrix(LABEL_NUM);
+	CMatrixEx matrixEx(LABEL_NUM);
 	//构造初始参数
 	for(int i = 0 ; i < width ; i ++)
 	{
@@ -2057,6 +1837,7 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			k_tags_num[c] ++;
 		}
 	}
+	//初始均值
 	for(int i = 0 ; i < k ; i ++)
 	{
 		if( k_tags_num[i] == 0)
@@ -2068,22 +1849,22 @@ void GMM_Core(	const vector<vector<float>> &lab,
 		E[i][3] = k_tags[i][3] / k_tags_num[i] ;
 		E[i][4] = k_tags[i][4] / k_tags_num[i] ;
 	}
-	k_tags.clear();
-	vector<double> et(label_num);
-	vector<double> dt(label_num2);
+	//初始协方差矩阵
+	vector<double> et(LABEL_NUM);
+	vector<double> dt(LABEL_NUM2);
 	for(int i = 0 ; i < width ; i ++)
 	{
 		for(int j = 0 ; j < height ; j ++)
 		{
 			int pos = i * height + j;
 			int c = fenClass_c[pos];
-			et[0] = lab[0][pos] - E[c][0];
-			et[1] = lab[1][pos] - E[c][1];
-			et[2] = lab[2][pos] - E[c][2];
-			et[3] = i - E[c][3];
-			et[4] = j - E[c][4];
-			Muti_Matrix(et,et,label_num,1,label_num,dt);
-			for(int w = 0 ; w < label_num2 ; w ++)
+			et[0] = lab[0][pos] -	E[c][0];
+			et[1] = lab[1][pos] -	E[c][1];
+			et[2] = lab[2][pos] -	E[c][2];
+			et[3] = i -				E[c][3];
+			et[4] = j -				E[c][4];
+			matrixEx.mul(et,et,LABEL_NUM,1,LABEL_NUM,dt);
+			for(int w = 0 ; w < LABEL_NUM2 ; w ++)
 			{
 				D[c][w] += dt[w];
 			}
@@ -2093,7 +1874,7 @@ void GMM_Core(	const vector<vector<float>> &lab,
 	{
 		if( k_tags_num[i] == 0)
 			continue;
-		for(int w = 0 ; w < label_num2 ; w ++)
+		for(int w = 0 ; w < LABEL_NUM2 ; w ++)
 		{
 			D[i][w] /= k_tags_num[i];
 		}
@@ -2101,55 +1882,54 @@ void GMM_Core(	const vector<vector<float>> &lab,
 
 	//
 
-	int MaxStepTime = 10;
-	vector<CMatrix> all_matrix(k,CMatrix(label_num));
-	vector<double> all_val(k);
-	vector<double> subt(label_num);
-	vector<double> tmp(label_num);
+	int MaxStepTime = 5;
+	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2));
+	vector<double>dv(k);
+	vector<double> subt(LABEL_NUM);
+	vector<double> tmp(LABEL_NUM);
 	vector<double> ans(1);
-	vector<double> sum_pi(sz);
 	vector<double> tmp_pi(k);
 	while(MaxStepTime -- )
 	{
 		for(int i = 0 ; i < k; i ++)
 		{
-			all_val[i] = all_matrix[i].inverse(D[i]);
+			bool not_ok = matrixEx.LUP_solve_inverse(D[i],D_[i]);
+			if(not_ok)
+			{
+				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
+			}
+			else 
+			{
+				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
+			}
 		}
 		//后验概率
-		for(int w = 0 ; w < k ; w ++)
+		for(int i = 0 ;i < width ; i ++)
 		{
-			if(all_val[w] == 0)
-				continue;
-			for(int i = 0 ;i < width ; i ++)
+			for(int j = 0 ; j < height ; j ++)
 			{
-				for(int j = 0 ; j < height ; j ++)
+				int pos = i * height + j;
+				double sum = 0;
+				for(int w = 0 ; w < k ; w ++)
 				{
-					int pos = i * height + j;
-					double sum = 0;
+					if(dv[w] == 0)
+						continue;
 					subt[0] = lab[0][pos] - E[w][0];
 					subt[1] = lab[1][pos] - E[w][1];
 					subt[2] = lab[2][pos] - E[w][2];
-					subt[3] = i - E[w][3];
-					subt[4] = j - E[w][4];
-					Muti_Matrix(subt,all_matrix[w].m_matrix,1,label_num,label_num,tmp);
-					Muti_Matrix(tmp,subt,1,label_num,1,ans);
-					pi[w][pos] = P[w] / sqrt(2 * Pi * all_val[w]) * exp(-0.5 * ans[0]);
+					subt[3] = i -			E[w][3];
+					subt[4] = j -			E[w][4];
+					matrixEx.mul(subt,D_[w],1,LABEL_NUM,LABEL_NUM,tmp);
+					matrixEx.mul(tmp,subt,1,LABEL_NUM,1,ans);
+					double sqrtdv = sqrt(dv[w]);
+					double expans = exp(-0.5 * ans[0]);
+					if(expans < 1e-10)
+						expans = 0;
+					pi[w][pos] = P[w] / powd / sqrtdv * expans ;
 				}
 			}
 		}
 		
-		for(int pos = 0 ; pos < sz ;pos++)
-		{
-			double sum_tmp = 0;
-			for(int w = 0 ; w < k ; w ++)
-			{
-				sum_tmp += pi[w][pos];
-			}
-			for(int w = 0 ;w < k ; w ++)
-			{
-				pi[w][pos] /= sum_tmp;
-			}
-		}
 		//求pi
 		for(int w = 0 ; w < k; w ++)
 		{
@@ -2158,7 +1938,7 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			{
 				sum_tmp += pi[w][pos];
 			}
-			P[w] = sum_tmp / k_tags_num[w];
+			P[w] = sum_tmp / sz;
 			tmp_pi[w] = sum_tmp;
 		}
 
@@ -2191,7 +1971,7 @@ void GMM_Core(	const vector<vector<float>> &lab,
 		//求协方差矩阵
 		for(int w = 0 ; w < k; w ++)
 		{
-			for(int i = 0 ; i < label_num2 ; i ++)
+			for(int i = 0 ; i < LABEL_NUM2 ; i ++)
 			{
 				D[w][i] = 0;
 			}
@@ -2205,14 +1985,14 @@ void GMM_Core(	const vector<vector<float>> &lab,
 					subt[2] = lab[2][pos] - E[w][2];
 					subt[3] = i - E[w][3];
 					subt[4] = j - E[w][4];
-					Muti_Matrix(subt,subt,label_num,1,label_num,dt);
-					for(int t = 0 ; t < label_num2 ; t ++)
+					matrixEx.mul(subt,subt,LABEL_NUM,1,LABEL_NUM,dt);
+					for(int t = 0 ; t < LABEL_NUM2 ; t ++)
 					{
 						D[w][t] += pi[w][pos] * dt[t];
 					}
 				}
 			}
-			for(int i = 0 ; i < label_num2 ; i ++)
+			for(int i = 0 ; i < LABEL_NUM2 ; i ++)
 			{
 				D[w][i] /= tmp_pi[w];
 			}
@@ -2525,27 +2305,29 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int height,
 				int &k)
 {
-	int label_num = 5;
 	int T = 1.5;
-	int label_num2 = label_num * label_num;
 	int sz = width * height;
-	vector<vector<double>> E(k,vector<double>(label_num,0));
-	vector<vector<double>> D(k,vector<double>(label_num2,0));
+	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
+	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
+	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2)); 
 	vector<int> c_num(k,0);
-	vector<double>e(label_num);
-	vector<double>t(label_num);
-	vector<double>d(label_num2);
+	vector<double>e(LABEL_NUM);
+	vector<double>t(LABEL_NUM);
+	vector<double>d(LABEL_NUM2);
 	vector<int> fenClass_t(sz);
 	vector<double> ans(1);
+	
+	CMatrix matrix(LABEL_NUM);
+	CMatrixEx matrixEx(LABEL_NUM);
 	for(int i = 0 ; i < width ; i ++)
 	{
 		for(int j = 0 ; j < height ; j++)
 		{
 			int pos = i * height + j;
 			int c = fenClass_c[pos];
-			E[c][0] += lab[0][c];
-			E[c][1] += lab[1][c];
-			E[c][2] += lab[2][c];
+			E[c][0] += lab[0][pos];
+			E[c][1] += lab[1][pos];
+			E[c][2] += lab[2][pos];
 			E[c][3] += i;
 			E[c][4] += j;
 			c_num[c] ++;
@@ -2567,13 +2349,13 @@ void ICM_Core(const vector<vector<float>> &lab,
 		{
 			int pos = i * height + j;
 			int c = fenClass_c[pos];
-			e[0] = lab[0][c] - E[c][0];
-			e[1] = lab[1][c] - E[c][1];
-			e[2] = lab[2][c] - E[c][2];
-			e[3] = i - E[c][3];
-			e[4] = j - E[c][4];
-			Muti_Matrix(e,e,label_num,1,label_num,d);
-			for(int w = 0 ; w < label_num2 ;w ++)
+			e[0] = lab[0][pos]	-	E[c][0];
+			e[1] = lab[1][pos]	-	E[c][1];
+			e[2] = lab[2][pos]	-	E[c][2];
+			e[3] = i			-	E[c][3];
+			e[4] = j			-	E[c][4];
+			matrixEx.mul(e,e,LABEL_NUM,1,LABEL_NUM,d);
+			for(int w = 0 ; w < LABEL_NUM2 ;w ++)
 			{
 				D[c][w] += d[w];
 			}
@@ -2583,7 +2365,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 	{
 		if(c_num[i] == 0)
 			continue;
-		for(int w = 0 ; w < label_num2; w++)
+		for(int w = 0 ; w < LABEL_NUM2; w++)
 		{
 			D[i][w] /= c_num[i];
 		}
@@ -2592,38 +2374,52 @@ void ICM_Core(const vector<vector<float>> &lab,
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
+	vector<double> dv(k);
 	int s_8[8];
 	int spos = 0;
-	CMatrix matrix(label_num);
 	while(Max_Time -- )
 	{
 		for(int i = 0 ; i < sz ; i++)
 			fenClass_t[i] = fenClass_c[i];
+
+		for(int i =0 ; i < k ; i ++)
+		{
+			bool not_zero = matrixEx.LUP_solve_inverse(D[i],D_[i]);
+			if(not_zero)
+			{
+				dv[i] = matrix.det(LABEL_NUM,D[i]);
+			}
+			else 
+				dv[i] = 0;
+		}
 		for(int i = 0 ; i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j++)
 			{
 				int pos = i * height + j;
 				int c = fenClass_t[pos];
+				//存储pos周围的八邻域类情况
 				for(int w = 0 ; w < 8 ; w++)
 				{
 					int nx = i + Move8[w][0];
 					int ny = j + Move8[w][1];
-					int npos = nx * height + ny;
-					if(npos <0 || npos >=sz)
+					
+					if(nx < 0 || ny < 0 || nx >=width || ny >= height)
 						continue;
-					if(num[fenClass_t[npos]] == 0)
+					int npos = nx * height + ny;
+					int nc = fenClass_t[npos];
+					if(num[nc] == 0)
 					{
-						s_8[spos] = fenClass_t[npos];
+						s_8[spos] = nc;
 						spos ++;
 					}
-					num[fenClass_t[npos]] ++;
+					num[nc] ++;
 				}
 				double z = 0;
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int tnum = num[s_8[w]];
-					int b = tnum + tnum - 8;
+					int b = 8 - tnum - tnum;
 					P[s_8[w]] = exp(-1.0 * b / T);
 					z += P[s_8[w]];
 				}
@@ -2636,17 +2432,17 @@ void ICM_Core(const vector<vector<float>> &lab,
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int c = s_8[w];
-					double dv = matrix.inverse(D[c]);
-					if(dv == 0)
+					
+					if(dv[c] == 0)
 						continue;
 					d[0] = lab[0][pos] - E[c][0];
 					d[1] = lab[1][pos] - E[c][1];
 					d[2] = lab[2][pos] - E[c][2];
 					d[3] = i - E[c][3];
 					d[4] = j - E[c][4];
-					Muti_Matrix(d,matrix.m_matrix,1,label_num,label_num,t);
-					Muti_Matrix(t,d,1,label_num,1,ans);
-					double pi = P[c] / pow(2*Pi,2.5) / sqrt(dv) *exp(-0.5 * ans[0]);  
+					matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
+					matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
+					double pi = P[c] / pow(2*Pi,2.5) / sqrt(dv[c]) *exp(-0.5 * ans[0]);  
 					if(pi > max_pi)
 					{
 						tc = c;
