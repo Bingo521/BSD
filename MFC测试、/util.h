@@ -533,3 +533,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int height,
 				int &k);
 void Avg_n2(vector<vector<float>> & lab,int width,int height,int n);
+
+void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k);
+
+void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k);

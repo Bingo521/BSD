@@ -126,9 +126,9 @@ BOOL CMFC²âÊÔ¡¢Dlg::OnInitDialog()
 		fclose(file);
 	}*/
 	//fopen_s(&file,m_ini_path.GetBuffer(),"r");
-	mlfRate = 0.5;
+	mlfRate = 10;
 	mStep = 2;
-	miK = 40;
+	miK = 400;
 	mSub = 1;
 	//fscanf_s(file,"%s%lf%d",buffer,&mSub,&miK);
 	//fclose(file);
@@ -142,6 +142,7 @@ BOOL CMFC²âÊÔ¡¢Dlg::OnInitDialog()
 	m_select.AddString(TEXT("GMM"));
 	m_select.AddString(TEXT("GMM1"));
 	m_select.AddString(TEXT("SLIC"));
+	m_select.AddString(TEXT("ICM"));
 	m_select.AddString(TEXT("Test"));
 	m_select.AddString(TEXT("LeftK"));
 	//showDlg = new ShowPicture(this);
@@ -306,6 +307,11 @@ UINT  CMFC²âÊÔ¡¢Dlg::run(LPVOID pParam)
 	else if(pa->type == "LeftK")
 	{
 		LeftK(*pa->res,*pa->des,pa->k,pa->path);
+		sprintf_s(buffer,1024,"_%d",pa->k);
+	}
+	else if(pa->type == "ICM")
+	{
+		ICM(*pa->res,*pa->des,pa->k,pa->rate);
 		sprintf_s(buffer,1024,"_%d",pa->k);
 	}
 	te = clock();

@@ -1888,11 +1888,13 @@ void GMM_Core(	const vector<vector<float>> &lab,
 	vector<double> subt(LABEL_NUM);
 	vector<double> tmp(LABEL_NUM);
 	vector<double> ans(1);
-	vector<double> tmp_pi(k);
+	vector<double> tmp_pi(k,1);
 	while(MaxStepTime -- )
 	{
 		for(int i = 0 ; i < k; i ++)
 		{
+			if(tmp_pi[i] == 0)
+				continue;
 			bool not_ok = matrixEx.LUP_solve_inverse(D[i],D_[i]);
 			if(not_ok)
 			{
@@ -1900,7 +1902,7 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			}
 			else 
 			{
-				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
+				dv[i] = 0;
 			}
 		}
 		//后验概率
@@ -1913,7 +1915,9 @@ void GMM_Core(	const vector<vector<float>> &lab,
 				for(int w = 0 ; w < k ; w ++)
 				{
 					if(dv[w] == 0)
+					{
 						continue;
+					}
 					subt[0] = lab[0][pos] - E[w][0];
 					subt[1] = lab[1][pos] - E[w][1];
 					subt[2] = lab[2][pos] - E[w][2];
@@ -1922,10 +1926,31 @@ void GMM_Core(	const vector<vector<float>> &lab,
 					matrixEx.mul(subt,D_[w],1,LABEL_NUM,LABEL_NUM,tmp);
 					matrixEx.mul(tmp,subt,1,LABEL_NUM,1,ans);
 					double sqrtdv = sqrt(dv[w]);
-					double expans = exp(-0.5 * ans[0]);
+					double expans = 0;
+					if(ans[0] < 50)
+						expans = exp(-0.5 * ans[0]);
 					if(expans < 1e-10)
 						expans = 0;
-					pi[w][pos] = P[w] / powd / sqrtdv * expans ;
+					pi[w][pos] =INFF * P[w] ;
+					if(pi[w][pos] < 1e-10)
+					{
+						pi[w][pos] = 0;
+					}
+					pi[w][pos] /= powd;
+					if(pi[w][pos] < 1e-10)
+					{
+						pi[w][pos] = 0;
+					}
+					pi[w][pos] /= sqrtdv;
+					if(pi[w][pos] < 1e-10)
+					{
+						pi[w][pos] = 0;
+					}
+					pi[w][pos] *= expans;
+					if(pi[w][pos] < 1e-10)
+					{
+						pi[w][pos] = 0;
+					}
 				}
 			}
 		}
@@ -1994,13 +2019,18 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			}
 			for(int i = 0 ; i < LABEL_NUM2 ; i ++)
 			{
+				if(tmp_pi[w] == 0)
+				{
+					break;
+				}
 				D[w][i] /= tmp_pi[w];
 			}
 		} 
 
 	}
 	//EM算法结束
-
+	FILE * file = NULL;
+	fopen_s(&file,"Logs","w");
 	for(int pos = 0 ; pos < sz ; pos ++)
 	{
 		int max_index = 0;
@@ -2010,9 +2040,15 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			{
 				max_index = w;
 			}
+			
 		}
+		fprintf_s(file,"%10.2lf",pi[max_index][pos]);
+		if((pos + 1) % width == 0)
+		fprintf_s(file,"\n");
 		fenClass_c[pos] = max_index;
 	}
+	fclose(file);
+	LogDebug(fenClass_c,width,height,"Log");
 }
 void GMM_Core1(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
@@ -2305,8 +2341,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int height,
 				int &k)
 {
-	int T = 1.5;
+	int T = 1;
+	double bate = 0.7;
 	int sz = width * height;
+	int S = sqrt(sz / k)+0.5;
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
 	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
 	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2)); 
@@ -2370,7 +2408,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 			D[i][w] /= c_num[i];
 		}
 	}
-	int Max_Time = 10;
+	int Max_Time = 2*S ;
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
@@ -2387,7 +2425,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 			bool not_zero = matrixEx.LUP_solve_inverse(D[i],D_[i]);
 			if(not_zero)
 			{
-				dv[i] = matrix.det(LABEL_NUM,D[i]);
+				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
 			}
 			else 
 				dv[i] = 0;
@@ -2419,7 +2457,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int tnum = num[s_8[w]];
-					int b = 8 - tnum - tnum;
+					int b = (8 - tnum - tnum)*bate;
 					P[s_8[w]] = exp(-1.0 * b / T);
 					z += P[s_8[w]];
 				}
@@ -2428,13 +2466,15 @@ void ICM_Core(const vector<vector<float>> &lab,
 					P[s_8[w]] /= z;
 				}
 				int tc = c;
-				int max_pi = -1;
+				double max_pi = -100000;
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int c = s_8[w];
 					
 					if(dv[c] == 0)
+					{
 						continue;
+					}
 					d[0] = lab[0][pos] - E[c][0];
 					d[1] = lab[1][pos] - E[c][1];
 					d[2] = lab[2][pos] - E[c][2];
@@ -2442,7 +2482,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 					d[4] = j - E[c][4];
 					matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
 					matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
-					double pi = P[c] / pow(2*Pi,2.5) / sqrt(dv[c]) *exp(-0.5 * ans[0]);  
+					double pi = log(P[c] / pow(2*Pi,2.5) / sqrt(dv[c]) *exp(-0.5 * ans[0]));  
 					if(pi > max_pi)
 					{
 						tc = c;
@@ -2542,5 +2582,86 @@ void Avg_n2(vector<vector<float>> & lab,int width,int height,int n)
 			lab[2][pos] /= lensz;
 		}
 	}
+}
+
+void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k)
+{
+	int sz = width * height;
+	vector<bool> is_visit(sz,false);
+	vector<int> Que(sz);
+	int Qsz;
+	int Qpos;
+	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	vector<int> fenClass_t = fenClass_c;
+	int nc = 0;
+	for(int i = 0 ; i < sz ; i++)
+	{
+		if(is_visit[i])
+			continue;
+		Qsz = 1;
+		Qpos = 0;
+		Que[0]=i;
+		int c = fenClass_t[i];
+		is_visit[i] = true;
+		while(Qpos < Qsz)
+		{
+			int pos = Que[Qpos];
+			Qpos++;
+			fenClass_c[pos] = nc;
+			int x = pos / height;
+			int y = pos % height;
+			for(int j = 0 ; j < 8;j++)
+			{
+				int nx = x + Move8[j][0];
+				int ny = y + Move8[j][1];
+				if(nx < 0 || ny < 0 || nx >= width || ny >= height)
+				{
+					continue;
+				}
+				int npos = nx * height + ny;
+				if(is_visit[npos] || fenClass_t[npos] != c)
+					continue;
+				is_visit[npos] = true;
+				Que[Qsz] = npos;
+				Qsz ++;
+			}
+		}
+		nc++;
+	}
+	k = nc;
+}
+
+void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k)
+{
+	int sz = width * height;
+	int S = sqrt(sz / k) + 0.5;
+	int swidth	= width		*	sqrt(1.0/k) + 0.5;
+	int sheight = height	*	sqrt(1.0/k) + 0.5;
+	int num_x = width / swidth + (width%swidth>0);
+	int num_y = height / sheight + (height%sheight>0);
+	k = num_x * num_y;
+	fenClass_c = vector<int>(sz);
+	for(int i = 0 ; i < num_x ; i++)
+	{
+		for(int j = 0 ; j < num_y ;j++)
+		{
+			int c = i * num_y + j;
+			int sx = i * swidth;
+			int sy = j * sheight;
+			for(int ii = 0 ; ii < swidth ; ii++)
+			{
+				for(int jj =0; jj < sheight ; jj++)
+				{
+					int nx = sx + ii;
+					int ny = sy + jj;
+					if(nx < 0 || nx >= width || ny<0 || ny >= height)
+						continue;
+					int pos = nx * height + ny;
+					fenClass_c[pos] = c;
+				}
+			}
+		}
+	}
+	
 }
 
