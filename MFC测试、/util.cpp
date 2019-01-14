@@ -2341,8 +2341,8 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int height,
 				int &k)
 {
-	int T = 1;
-	double bate = 0.7;
+	int T = 1.5;
+	double bate = 0.5;
 	int sz = width * height;
 	int S = sqrt(sz / k)+0.5;
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
@@ -2366,8 +2366,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 			E[c][0] += lab[0][pos];
 			E[c][1] += lab[1][pos];
 			E[c][2] += lab[2][pos];
+#ifdef LABEL5
 			E[c][3] += i;
 			E[c][4] += j;
+#endif
 			c_num[c] ++;
 		}
 	}
@@ -2378,8 +2380,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 		E[i][0] /= c_num[i];
 		E[i][1] /= c_num[i];
 		E[i][2] /= c_num[i];
+#ifdef LABEL5
 		E[i][3] /= c_num[i];
 		E[i][4] /= c_num[i];
+#endif
 	}
 	for(int i = 0 ; i < width ; i ++)
 	{
@@ -2390,8 +2394,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 			e[0] = lab[0][pos]	-	E[c][0];
 			e[1] = lab[1][pos]	-	E[c][1];
 			e[2] = lab[2][pos]	-	E[c][2];
+#ifdef LABEL5
 			e[3] = i			-	E[c][3];
 			e[4] = j			-	E[c][4];
+#endif
 			matrixEx.mul(e,e,LABEL_NUM,1,LABEL_NUM,d);
 			for(int w = 0 ; w < LABEL_NUM2 ;w ++)
 			{
@@ -2408,12 +2414,12 @@ void ICM_Core(const vector<vector<float>> &lab,
 			D[i][w] /= c_num[i];
 		}
 	}
-	int Max_Time = 2*S ;
+	int Max_Time = S ;
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
 	vector<double> dv(k);
-	int s_8[8];
+	int s_8[N];
 	int spos = 0;
 	while(Max_Time -- )
 	{
@@ -2437,7 +2443,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int pos = i * height + j;
 				int c = fenClass_t[pos];
 				//存储pos周围的八邻域类情况
-				for(int w = 0 ; w < 8 ; w++)
+				for(int w = 0 ; w < 4 ; w++)
 				{
 					int nx = i + Move8[w][0];
 					int ny = j + Move8[w][1];
@@ -2453,6 +2459,26 @@ void ICM_Core(const vector<vector<float>> &lab,
 					}
 					num[nc] ++;
 				}
+				/*int sx = max(0,i - LINK_N);
+				int sy = max(0,j - LINK_N);
+				int ex = min(width - 1, i + LINK_N);
+				int ey = min(height - 1, j + LINK_N);
+				for(int ii = sx ; ii <= ex ; ii ++)
+				{
+					for(int jj = sy ; jj <= ey ; jj ++)
+					{
+						if(i == ii && j == jj)
+							continue;
+						int npos = ii * height + jj;
+						int nc = fenClass_t[npos];
+						if(num[nc] == 0)
+						{
+							s_8[spos] = nc;
+							spos ++;
+						}
+						num[nc] ++;
+					}
+				}*/
 				double z = 0;
 				for(int w = 0 ; w < spos ; w ++)
 				{
@@ -2478,11 +2504,13 @@ void ICM_Core(const vector<vector<float>> &lab,
 					d[0] = lab[0][pos] - E[c][0];
 					d[1] = lab[1][pos] - E[c][1];
 					d[2] = lab[2][pos] - E[c][2];
+#ifdef LABEL5
 					d[3] = i - E[c][3];
 					d[4] = j - E[c][4];
+#endif
 					matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
 					matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
-					double pi = log(P[c] / pow(2*Pi,2.5) / sqrt(dv[c]) *exp(-0.5 * ans[0]));  
+					double pi = log(P[c] / pow(2*Pi,LABEL_NUM / 2) / sqrt(dv[c]) * exp(-0.5 * ans[0]));  
 					if(pi > max_pi)
 					{
 						tc = c;

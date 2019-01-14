@@ -64,9 +64,18 @@
 #define INFF 9223372036854775807 
 #define INFI 0x3f3f3f3f
 #define INFLL  9223372036854775807
+#define LABEL3
+#ifdef LABEL5
+	#define LABEL_NUM 5
+	#define LABEL_NUM2 25
+#endif
+#ifdef LABEL3
+	#define LABEL_NUM 3
+	#define LABEL_NUM2 9
+#endif
 
-#define LABEL_NUM 5
-#define LABEL_NUM2 25
+#define LINK_N	1
+#define N (LINK_N + 1)*(LINK_N + 1)
 const double Pi = acos(-1);
 #ifdef _UNICODE
 #if defined _M_IX86
