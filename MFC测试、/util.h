@@ -287,7 +287,7 @@ public:
 class CMatrixEx
 {
 	public:
-		const int lim0 ; 
+		const double lim0 ; 
 		vector<double> tmp_n,tmp_n2,A_mirror,inv_A_each,B,b,L,U;
 		vector<int> P;
 		int N;
@@ -443,7 +443,7 @@ class CMatrixEx
 	  }
 	}
 	//LUP求逆(将每列b求出的各列x进行组装)
-	bool LUP_solve_inverse(vector<double> &A,vector<double> &inv_A)
+	bool LUP_solve_inverse(const vector<double> &A,vector<double> &inv_A)
 	{
 		//创建矩阵A的副本，注意不能直接用A计算，因为LUP分解算法已将其改变
 		bool ans;
@@ -478,6 +478,8 @@ class CMatrixEx
 
 int Find(int *arr,int k);
 int Find(vector<int> &arr,int k);
+bool GetSubImg(const CImage &res,CImage &des,CPoint pos,int width,int height);
+CString GetPath(CString path,CString app);
 void Image2Lab(const CImage &des, vector<vector<float>> &lab);
 void Image2Lab(const CImage &des, vector<vector<vector<float>>> &lab);
 void GetImageGrad(const vector<vector<vector<float>>> &lab,vector<vector<double>> &grad);
@@ -505,6 +507,7 @@ void DrawBorder1(CImage &des,vector<vector<int>> &fenClass_c);
 void DrawBorder1(CImage &des,vector<int> &fenClass_c,int width,int height);
 void DrawBorderWithColor(CImage &des,vector<int> &fenClass_c,int k,int width,int height);
 void DrawBorderOnlyLine(CImage &des,vector<int> &fenClass_c,int width,int height);
+void DrawBorderWidthAvgColor(CImage &des,vector<int> &fenClass_c,int width,int height);
 void GMM_Core(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
 				vector<int> & point_num,
@@ -537,3 +540,7 @@ void Avg_n2(vector<vector<float>> & lab,int width,int height,int n);
 void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k);
 
 void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k);
+
+void n_avg_2_k_(vector<int> &fenClass_c,int width,int height,int &k);
+
+void LogDebug(vector<vector<double>>&,int width,int height,int k,CString name,int t);

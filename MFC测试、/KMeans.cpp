@@ -632,6 +632,6 @@ void KMeans1(CImage &res,CImage &des,int k,double rate)
 	Image2Lab(des,lab);
 	GetImageGrad(lab,grad);
 	KMeans_Core(lab,grad,fenClass_c,k,rate);
-	MergeClassByColor(lab,fenClass_c,k);
-	DrawBorder(des,fenClass_c);
+	//MergeClassByColor(lab,fenClass_c,k);
+	DrawBorder1(des,fenClass_c);
 }

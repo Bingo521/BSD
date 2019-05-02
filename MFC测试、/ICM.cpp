@@ -18,7 +18,7 @@ int ICM(CImage &res,CImage &des,int k,double M)
 	MergeClassByColor(lab,fenClass_c,width,height,k);
 	delete_empty_calss(fenClass_c,width,height,k);
 #else
-	n_avg_2_k(fenClass_c,width,height,k);
+	n_avg_2_k_(fenClass_c,width,height,k);
 #endif
 	ICM_Core(lab,fenClass_c,width,height,k);
 	MergeClassByColor(lab,fenClass_c,width,height,k);

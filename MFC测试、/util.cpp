@@ -47,6 +47,32 @@ int Find(vector<int> &arr,int k)
 	return k;
 }
 
+bool GetSubImg(const CImage &res,CImage &des,CPoint pos,int width,int height)
+{
+	des.Create(width,height,res.GetBPP());
+	CImageDC imageDC(des);
+	POINT p;
+	CRect rect = CRect(0,0,width,height);
+	p.x=pos.x;
+	p.y=pos.y;
+	res.BitBlt(imageDC,rect,p);
+	return true;
+}
+
+CString GetPath(CString path,CString app)
+{
+	int i;
+	for(i=path.GetLength();i>0;i--)
+	{
+		if(path[i]=='.')
+		{
+			break;
+		}
+	}
+	CString left =  path.Left(i);
+	CString right = path.Right(path.GetLength()-i);
+	return left+app+right;
+}
 void Image2Lab(const CImage &des, vector<vector<vector<float>>> &lab)
 {
 	int width = des.GetWidth();
@@ -64,8 +90,8 @@ void Image2Lab(const CImage &des, vector<vector<vector<float>>> &lab)
 		}
 	}
 	et = clock();
-	str.Format("--开辟%.2lf",difftime(et,st));
-	AfxMessageBox(str);
+	//str.Format("--开辟%.2lf",difftime(et,st));
+	//AfxMessageBox(str);
 	//转换颜色空间
 
 	byte * blt = (byte*)des.GetBits();
@@ -1813,28 +1839,37 @@ void GMM_Core(	const vector<vector<float>> &lab,
 				int &k)
 {
 	int sz = width * height;
-	const double powd = pow(2*Pi,LABEL_NUM / 2);
+	const double powd = pow(2*Pi,LABEL_NUM);
 	vector<vector<double>> pi(k,vector<double>(sz));
 	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
 	vector<double> P(k,0);
 	vector<vector<double>> k_tags(k,vector<double>(LABEL_NUM,0));
 	vector<int> k_tags_num(k,0);
-	CMatrix matrix(LABEL_NUM);
-	CMatrixEx matrixEx(LABEL_NUM);
+	//CMatrix matrix(LABEL_NUM);
+	//CMatrixEx matrixEx(LABEL_NUM);
+	MatrixQuick mat(LABEL_NUM);
 	//构造初始参数
+	int pos=0;
 	for(int i = 0 ; i < width ; i ++)
 	{
 		for(int j = 0 ; j < height ; j++)
 		{
-			int pos = i * height + j;
 			int c = fenClass_c[pos];
+			if(c >=k || c <0)
+			{
+				pos++;
+				continue;
+			}
 			k_tags[c][0] += lab[0][pos];
 			k_tags[c][1] += lab[1][pos];
 			k_tags[c][2] += lab[2][pos];
+#ifdef LABEL5
 			k_tags[c][3] += i;
 			k_tags[c][4] += j;
+#endif
 			k_tags_num[c] ++;
+			pos++;
 		}
 	}
 	//初始均值
@@ -1846,28 +1881,38 @@ void GMM_Core(	const vector<vector<float>> &lab,
 		E[i][0] = k_tags[i][0] / k_tags_num[i] ;
 		E[i][1] = k_tags[i][1] / k_tags_num[i] ;
 		E[i][2] = k_tags[i][2] / k_tags_num[i] ;
+#ifdef LABEL5
 		E[i][3] = k_tags[i][3] / k_tags_num[i] ;
 		E[i][4] = k_tags[i][4] / k_tags_num[i] ;
+#endif
 	}
 	//初始协方差矩阵
 	vector<double> et(LABEL_NUM);
 	vector<double> dt(LABEL_NUM2);
+	pos=0;
 	for(int i = 0 ; i < width ; i ++)
 	{
 		for(int j = 0 ; j < height ; j ++)
 		{
-			int pos = i * height + j;
 			int c = fenClass_c[pos];
+			if(c == -1)
+			{
+				pos++;
+				continue;
+			}
 			et[0] = lab[0][pos] -	E[c][0];
 			et[1] = lab[1][pos] -	E[c][1];
 			et[2] = lab[2][pos] -	E[c][2];
+#ifdef LABEL5
 			et[3] = i -				E[c][3];
 			et[4] = j -				E[c][4];
-			matrixEx.mul(et,et,LABEL_NUM,1,LABEL_NUM,dt);
+#endif
+			mat.Mul(&et[0],&et[0],LABEL_NUM,1,LABEL_NUM,&dt[0]);
 			for(int w = 0 ; w < LABEL_NUM2 ; w ++)
 			{
-				D[c][w] += dt[w];
+				D[c][w] +=dt[w];
 			}
+			pos++;
 		}
 	}
 	for(int i = 0 ; i < k ; i ++)
@@ -1882,35 +1927,46 @@ void GMM_Core(	const vector<vector<float>> &lab,
 
 	//
 
-	int MaxStepTime = 5;
+	int MaxStepTime = 30;
 	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2));
 	vector<double>dv(k);
 	vector<double> subt(LABEL_NUM);
 	vector<double> tmp(LABEL_NUM);
 	vector<double> ans(1);
 	vector<double> tmp_pi(k,1);
+	vector<double> sums(sz);
 	while(MaxStepTime -- )
 	{
 		for(int i = 0 ; i < k; i ++)
 		{
 			if(tmp_pi[i] == 0)
 				continue;
-			bool not_ok = matrixEx.LUP_solve_inverse(D[i],D_[i]);
+			bool not_ok = mat.Inverse(&D[i][0],&D_[i][0]);
 			if(not_ok)
 			{
-				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
+				dv[i] = abs(mat.Det(&D[i][0]));
 			}
-			else 
+			if(not_ok || dv[i] < 1e-10)
 			{
-				dv[i] = 0;
+				for(int ii = 0 ;ii < LABEL_NUM;ii++)
+				{
+					D[i][ii*LABEL_NUM+ii] += 1e-10;
+				}
+				mat.Inverse(&D[i][0],&D_[i][0]);
+				dv[i] = abs(mat.Det(&D[i][0]));
 			}
 		}
 		//后验概率
+		pos=0;
+		for(int i=0;i<sz;i++)
+		{
+			sums[i] = 0;
+		}
 		for(int i = 0 ;i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j ++)
 			{
-				int pos = i * height + j;
+				//int pos = i * height + j;
 				double sum = 0;
 				for(int w = 0 ; w < k ; w ++)
 				{
@@ -1921,41 +1977,30 @@ void GMM_Core(	const vector<vector<float>> &lab,
 					subt[0] = lab[0][pos] - E[w][0];
 					subt[1] = lab[1][pos] - E[w][1];
 					subt[2] = lab[2][pos] - E[w][2];
+#ifdef LABEL5
 					subt[3] = i -			E[w][3];
 					subt[4] = j -			E[w][4];
-					matrixEx.mul(subt,D_[w],1,LABEL_NUM,LABEL_NUM,tmp);
-					matrixEx.mul(tmp,subt,1,LABEL_NUM,1,ans);
-					double sqrtdv = sqrt(dv[w]);
-					double expans = 0;
-					if(ans[0] < 50)
-						expans = exp(-0.5 * ans[0]);
-					if(expans < 1e-10)
-						expans = 0;
-					pi[w][pos] =INFF * P[w] ;
-					if(pi[w][pos] < 1e-10)
-					{
-						pi[w][pos] = 0;
-					}
-					pi[w][pos] /= powd;
-					if(pi[w][pos] < 1e-10)
-					{
-						pi[w][pos] = 0;
-					}
-					pi[w][pos] /= sqrtdv;
-					if(pi[w][pos] < 1e-10)
-					{
-						pi[w][pos] = 0;
-					}
-					pi[w][pos] *= expans;
-					if(pi[w][pos] < 1e-10)
-					{
-						pi[w][pos] = 0;
-					}
+#endif
+					mat.Mul(&subt[0],&D_[w][0],1,LABEL_NUM,LABEL_NUM,&tmp[0]);
+					mat.Mul(&tmp[0],&subt[0],1,LABEL_NUM,1,&ans[0]);
+					pi[w][pos] = P[w]/(powd * sqrt(dv[w])) * exp(-0.5 * ans[0]) ;
+					sums[pos]+=pi[w][pos];
 				}
+				pos++;
 			}
 		}
 		
-		//求pi
+		for(int i=0;i<sz;i++)
+		{
+			for(int j=0;j<k;j++)
+			{
+				pi[j][i]/=sums[i];
+			}
+		}
+
+		//LogDebug(pi,width,height,k,"Logs",MaxStepTime);
+		//求P[先验概率]
+		double sum_nk=0;
 		for(int w = 0 ; w < k; w ++)
 		{
 			double sum_tmp = 0;
@@ -1965,91 +2010,111 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			}
 			P[w] = sum_tmp / sz;
 			tmp_pi[w] = sum_tmp;
+			sum_nk += sum_tmp;
 		}
-
+		CString str;
+		str.Format("%lf %d",sum_nk,sz);
+		AfxMessageBox(str);
 		//求u
 		for(int w = 0 ; w < k; w ++)
 		{
+			if(tmp_pi[w] < LIM0)
+			{
+				continue;
+			}
 			E[w][0] = 0;
 			E[w][1] = 0;
 			E[w][2] = 0;
+#ifdef LABEL5
 			E[w][3] = 0;
 			E[w][4] = 0;
+#endif
+			pos=0;
 			for(int i = 0 ; i < width ; i ++)
 			{
 				for(int j = 0 ; j < height ; j ++)
 				{
-					int pos = i * height +j;
+					//int pos = i * height +j;
 					E[w][0] += pi[w][pos] * lab[0][pos] ;
 					E[w][1] += pi[w][pos] * lab[1][pos] ;
 					E[w][2] += pi[w][pos] * lab[2][pos] ;
+#ifdef LABEL5
 					E[w][3] += pi[w][pos] * i ;
 					E[w][4] += pi[w][pos] * j ;
+#endif
+					pos++;
 				}
 			}
 			E[w][0] /= tmp_pi[w];
 			E[w][1] /= tmp_pi[w];
 			E[w][2] /= tmp_pi[w];
+#ifdef LABEL5
 			E[w][3] /= tmp_pi[w];
 			E[w][4] /= tmp_pi[w];
+#endif
 		}
 		//求协方差矩阵
 		for(int w = 0 ; w < k; w ++)
 		{
+			if(tmp_pi[w] < LIM0)
+			{
+				continue;
+			}
 			for(int i = 0 ; i < LABEL_NUM2 ; i ++)
 			{
 				D[w][i] = 0;
 			}
+			pos=0;
 			for(int i = 0; i < width ; i ++)
 			{
 				for(int j = 0; j < height ; j++)
 				{
-					int pos = i * height + j;
+					//int pos = i * height + j;
 					subt[0] = lab[0][pos] - E[w][0];
 					subt[1] = lab[1][pos] - E[w][1];
 					subt[2] = lab[2][pos] - E[w][2];
+#ifdef LABEL5
 					subt[3] = i - E[w][3];
 					subt[4] = j - E[w][4];
-					matrixEx.mul(subt,subt,LABEL_NUM,1,LABEL_NUM,dt);
+#endif
+					mat.Mul(&subt[0],&subt[0],LABEL_NUM,1,LABEL_NUM,&dt[0]);
 					for(int t = 0 ; t < LABEL_NUM2 ; t ++)
 					{
 						D[w][t] += pi[w][pos] * dt[t];
 					}
+					pos++;
 				}
 			}
 			for(int i = 0 ; i < LABEL_NUM2 ; i ++)
 			{
-				if(tmp_pi[w] == 0)
-				{
-					break;
-				}
 				D[w][i] /= tmp_pi[w];
 			}
 		} 
 
 	}
 	//EM算法结束
-	FILE * file = NULL;
-	fopen_s(&file,"Logs","w");
-	for(int pos = 0 ; pos < sz ; pos ++)
-	{
-		int max_index = 0;
-		for(int w = 1 ; w < k ; w ++)
-		{
-			if(pi[max_index][pos] < pi[w][pos])
-			{
-				max_index = w;
-			}
-			
-		}
-		fprintf_s(file,"%10.2lf",pi[max_index][pos]);
-		if((pos + 1) % width == 0)
-		fprintf_s(file,"\n");
-		fenClass_c[pos] = max_index;
-	}
-	fclose(file);
-	LogDebug(fenClass_c,width,height,"Log");
+	//FILE * file = NULL;
+	//fopen_s(&file,"Logs","w");
+	//for(int pos = 0 ; pos < sz ; pos ++)
+	//{
+	//	int max_index = 0;
+	//	for(int w = 1 ; w < k ; w ++)
+	//	{
+	//		if(pi[max_index][pos] < pi[w][pos])
+	//		{
+	//			max_index = w;
+	//		}
+	//		
+	//	}
+	//	fprintf_s(file,"%10.2lf",pi[max_index][pos]);
+	//	if((pos + 1) % width == 0)
+	//	fprintf_s(file,"\n");
+	//	fenClass_c[pos] = max_index;
+	//}
+	//fclose(file);
+	//LogDebug(fenClass_c,width,height,"Log");
 }
+
 void GMM_Core1(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
 				vector<int> & point_num,
@@ -2217,7 +2282,7 @@ void KMeans_Core(	const vector<vector<vector<float>>> &lab,
 					int &k,
 					double M)
 {
-	int MaxTime = 20;
+	int MaxTime = 30;
 	int width = lab.size();
 	int height = lab[0].size();
 	vector<Tag> k_tags;
@@ -2341,10 +2406,11 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int height,
 				int &k)
 {
-	int T = 1.5;
-	double bate = 0.5;
+	double T = 1.5;
+	double bate = 1;
 	int sz = width * height;
 	int S = sqrt(sz / k)+0.5;
+	double powpi = pow(2*Pi,LABEL_NUM);
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
 	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
 	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2)); 
@@ -2353,97 +2419,136 @@ void ICM_Core(const vector<vector<float>> &lab,
 	vector<double>t(LABEL_NUM);
 	vector<double>d(LABEL_NUM2);
 	vector<int> fenClass_t(sz);
+	vector<bool> fenClass_is(k);
 	vector<double> ans(1);
 	
-	CMatrix matrix(LABEL_NUM);
-	CMatrixEx matrixEx(LABEL_NUM);
-	for(int i = 0 ; i < width ; i ++)
-	{
-		for(int j = 0 ; j < height ; j++)
-		{
-			int pos = i * height + j;
-			int c = fenClass_c[pos];
-			E[c][0] += lab[0][pos];
-			E[c][1] += lab[1][pos];
-			E[c][2] += lab[2][pos];
-#ifdef LABEL5
-			E[c][3] += i;
-			E[c][4] += j;
-#endif
-			c_num[c] ++;
-		}
-	}
-	for(int i = 0 ; i < k ; i ++)
-	{
-		if(c_num[i] == 0)
-			continue;
-		E[i][0] /= c_num[i];
-		E[i][1] /= c_num[i];
-		E[i][2] /= c_num[i];
-#ifdef LABEL5
-		E[i][3] /= c_num[i];
-		E[i][4] /= c_num[i];
-#endif
-	}
-	for(int i = 0 ; i < width ; i ++)
-	{
-		for(int j = 0 ; j < height ; j++)
-		{
-			int pos = i * height + j;
-			int c = fenClass_c[pos];
-			e[0] = lab[0][pos]	-	E[c][0];
-			e[1] = lab[1][pos]	-	E[c][1];
-			e[2] = lab[2][pos]	-	E[c][2];
-#ifdef LABEL5
-			e[3] = i			-	E[c][3];
-			e[4] = j			-	E[c][4];
-#endif
-			matrixEx.mul(e,e,LABEL_NUM,1,LABEL_NUM,d);
-			for(int w = 0 ; w < LABEL_NUM2 ;w ++)
-			{
-				D[c][w] += d[w];
-			}
-		}
-	}
-	for(int i = 0 ; i < k ; i ++)
-	{
-		if(c_num[i] == 0)
-			continue;
-		for(int w = 0 ; w < LABEL_NUM2; w++)
-		{
-			D[i][w] /= c_num[i];
-		}
-	}
-	int Max_Time = S ;
+	//CMatrix matrix(LABEL_NUM);
+	//CMatrixEx matrixEx(LABEL_NUM);
+	MatrixQuick mat(LABEL_NUM);
+
+	int Max_Time = S;
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
 	vector<double> dv(k);
+	vector<double> sub(LABEL_NUM);
 	int s_8[N];
 	int spos = 0;
 	while(Max_Time -- )
 	{
-		for(int i = 0 ; i < sz ; i++)
-			fenClass_t[i] = fenClass_c[i];
-
-		for(int i =0 ; i < k ; i ++)
+		for(int i = 0 ; i < k ; i ++)
 		{
-			bool not_zero = matrixEx.LUP_solve_inverse(D[i],D_[i]);
-			if(not_zero)
+			for(int j = 0 ; j < LABEL_NUM;j++)
 			{
-				dv[i] = abs(matrix.det(LABEL_NUM,D[i]));
+				E[i][j]=0;
 			}
-			else 
-				dv[i] = 0;
+			for(int j = 0; j < LABEL_NUM2;j++)
+			{
+				D[i][j]=0;
+			}
+			c_num[i]=0;
 		}
 		for(int i = 0 ; i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j++)
 			{
 				int pos = i * height + j;
+				int c = fenClass_c[pos];
+				E[c][0] += lab[0][pos];
+				E[c][1] += lab[1][pos];
+				E[c][2] += lab[2][pos];
+	#ifdef LABEL5
+				E[c][3] += i;
+				E[c][4] += j;
+	#endif
+				c_num[c] ++;
+			}
+		}
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			E[i][0] /= c_num[i];
+			E[i][1] /= c_num[i];
+			E[i][2] /= c_num[i];
+	#ifdef LABEL5
+			E[i][3] /= c_num[i];
+			E[i][4] /= c_num[i];
+	#endif
+		}
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_c[pos];
+				sub[0] = lab[0][pos]	-	E[c][0];
+				sub[1] = lab[1][pos]	-	E[c][1];
+				sub[2] = lab[2][pos]	-	E[c][2];
+	#ifdef LABEL5
+				sub[3] = i			-	E[c][3];
+				sub[4] = j			-	E[c][4];
+	#endif
+				//matrixEx.mul(e,e,LABEL_NUM,1,LABEL_NUM,d);
+				mat.Mul(&sub[0],&sub[0],LABEL_NUM,1,LABEL_NUM,&d[0]);
+				for(int w = 0 ; w < LABEL_NUM2 ;w ++)
+				{
+					D[c][w] += d[w];
+				}
+			}
+		}
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			for(int w = 0 ; w < LABEL_NUM2; w++)
+			{
+				D[i][w] /= c_num[i];
+			}
+		}
+		for(int i = 0 ; i < sz ; i++){
+			fenClass_t[i] = fenClass_c[i];		
+		}	
+		for(int i =0 ; i < k ; i ++)
+		{
+			
+			if(c_num[i] == 0)
+			{
+				continue;
+			}
+			fenClass_is[i] = 0;
+			//bool not_zero = matrixEx.LUP_solve_inverse(D[i],D_[i]);
+			bool not_zero = mat.Inverse(&D[i][0],&D_[i][0]);
+			dv[i] = abs(mat.Det(&D[i][0]));
+			if(!not_zero || dv[i] < 1e-10)
+			{
+				//dv[i] = abs(matrix.det(LABEL_NUM,D[i]));	
+				for(int ii=0;ii<LABEL_NUM;ii++)
+				{
+					D[i][ii*LABEL_NUM + ii]+=1e-5;
+				}
+				not_zero = mat.Inverse(&D[i][0],&D_[i][0]);
+				dv[i] = abs(mat.Det(&D[i][0]));
+				//fenClass_is[i] = 1;
+				//dv[i] = 0;
+			}
+			
+		}
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				
+				int pos = i * height + j;
 				int c = fenClass_t[pos];
+				if(c<0 || c>=k)
+				{
+					continue;
+				}
+				if(fenClass_is[c])
+					continue;
 				//存储pos周围的八邻域类情况
-				for(int w = 0 ; w < 4 ; w++)
+				for(int w = 0 ; w < 8 ; w++)
 				{
 					int nx = i + Move8[w][0];
 					int ny = j + Move8[w][1];
@@ -2459,31 +2564,11 @@ void ICM_Core(const vector<vector<float>> &lab,
 					}
 					num[nc] ++;
 				}
-				/*int sx = max(0,i - LINK_N);
-				int sy = max(0,j - LINK_N);
-				int ex = min(width - 1, i + LINK_N);
-				int ey = min(height - 1, j + LINK_N);
-				for(int ii = sx ; ii <= ex ; ii ++)
-				{
-					for(int jj = sy ; jj <= ey ; jj ++)
-					{
-						if(i == ii && j == jj)
-							continue;
-						int npos = ii * height + jj;
-						int nc = fenClass_t[npos];
-						if(num[nc] == 0)
-						{
-							s_8[spos] = nc;
-							spos ++;
-						}
-						num[nc] ++;
-					}
-				}*/
 				double z = 0;
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int tnum = num[s_8[w]];
-					int b = (8 - tnum - tnum)*bate;
+					double b = ( 8 - tnum - tnum)*bate;
 					P[s_8[w]] = exp(-1.0 * b / T);
 					z += P[s_8[w]];
 				}
@@ -2492,7 +2577,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 					P[s_8[w]] /= z;
 				}
 				int tc = c;
-				double max_pi = -100000;
+				double max_pi = -INFI;
 				for(int w = 0 ; w < spos ; w ++)
 				{
 					int c = s_8[w];
@@ -2501,16 +2586,18 @@ void ICM_Core(const vector<vector<float>> &lab,
 					{
 						continue;
 					}
-					d[0] = lab[0][pos] - E[c][0];
-					d[1] = lab[1][pos] - E[c][1];
-					d[2] = lab[2][pos] - E[c][2];
+					sub[0] = lab[0][pos] - E[c][0];
+					sub[1] = lab[1][pos] - E[c][1];
+					sub[2] = lab[2][pos] - E[c][2];
 #ifdef LABEL5
-					d[3] = i - E[c][3];
-					d[4] = j - E[c][4];
+					sub[3] = i - E[c][3];
+					sub[4] = j - E[c][4];
 #endif
-					matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
-					matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
-					double pi = log(P[c] / pow(2*Pi,LABEL_NUM / 2) / sqrt(dv[c]) * exp(-0.5 * ans[0]));  
+					//matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
+					//matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
+					mat.Mul(&sub[0],&D_[c][0],1,LABEL_NUM,LABEL_NUM,&t[0]);
+					mat.Mul(&t[0],&sub[0],1,LABEL_NUM,1,&ans[0]);
+					double pi = (P[c] / powpi / sqrt(dv[c]) * exp(-0.5 * ans[0]));  
 					if(pi > max_pi)
 					{
 						tc = c;
@@ -2658,9 +2745,39 @@ void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k)
 	}
 	k = nc;
 }
-
-void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k)
+/*
+w*h*k=W*H
+w/W=h/H
+w=h*W/H
+h^2*k*W/H=W*H
+h^2=H^2/k
+*/
+void n_avg_2_k_(vector<int> &fenClass_c,int width,int height,int &k)
 {
+	int sz = width * height;
+	double rate = sqrt(1.0/k);
+	int sw = width * rate;
+	int sh = height * rate;
+	int num_x = width / sw;
+	int num_y = height / sh;
+	k = num_x * num_y;
+	fenClass_c = vector<int>(sz);
+	for(int i=0;i<width;i++)
+	{
+		for(int j =0 ; j < height;j++)
+		{
+			int w = i/sw;
+			int h = j/sh;
+			if(w >= num_x)
+				w = num_x -1;
+			if(h >= num_y)
+				h = num_y -1;
+			fenClass_c[i*height+j]=w*num_y+h;
+		}
+	}
+}
+void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k)
+{//转成1-k类
 	int sz = width * height;
 	int S = sqrt(sz / k) + 0.5;
 	int swidth	= width		*	sqrt(1.0/k) + 0.5;
@@ -2693,3 +2810,33 @@ void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k)
 	
 }
 
+void LogDebug(vector<vector<double>>&pi,int width,int height,int k,CString name,int t)
+{
+	
+ 	int sz = width * height;
+	vector<CString> names(k);
+	vector<FILE*> files(k);
+	char buf1[20];
+	char buf2[20];
+	_itoa_s(t,buf1,10);
+	
+	for(int i =0 ; i < k ; i++)
+	{
+		_itoa_s(i,buf2,10);
+		names[i]=name+CString("_")+CString(buf1)+CString("_")+CString(buf2);
+		fopen_s(&files[i],names[i].GetBuffer(names[i].GetLength()),"w");
+	}
+	for(int pos = 0 ; pos < sz ; pos ++)
+	{
+		for(int w = 0 ; w < k ; w ++)
+		{
+			fprintf_s(files[w],"%10.2lf",pi[w][pos]);
+			if((pos + 1) % width == 0)
+				fprintf_s(files[w],"\n");
+		}
+	}
+	for(int i =0 ; i < k;i++)
+	{
+		fclose(files[i]);
+	}
+}

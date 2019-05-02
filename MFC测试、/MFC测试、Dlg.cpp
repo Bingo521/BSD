@@ -54,6 +54,7 @@ CMFC测试、Dlg::CMFC测试、Dlg(CWnd* pParent /*=NULL*/)
 	, mSub(0)
 	, mStep(0)
 	, m_selectValue(_T(""))
+	, muti_thread(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -71,6 +72,8 @@ void CMFC测试、Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BUTTON2, m_btStart);
 	DDX_Control(pDX, IDC_COMBO1, m_select);
 	DDX_CBString(pDX, IDC_COMBO1, m_selectValue);
+	DDX_CBString(pDX, IDC_COMBO2, muti_thread);
+	DDX_Control(pDX, IDC_COMBO2, muti_thread_c);
 }
 
 BEGIN_MESSAGE_MAP(CMFC测试、Dlg, CDialogEx)
@@ -81,6 +84,7 @@ BEGIN_MESSAGE_MAP(CMFC测试、Dlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON2, &CMFC测试、Dlg::OnBnClickedButton2)
 	ON_EN_CHANGE(IDC_EDIT4, &CMFC测试、Dlg::OnEnChangeEdit4)
 	ON_MESSAGE(WM_MESSOK,&CMFC测试、Dlg::OnMessOK)
+	ON_MESSAGE(WM_MESSOK1,&CMFC测试、Dlg::OnMessOK1)
 END_MESSAGE_MAP()
 
 
@@ -136,7 +140,7 @@ BOOL CMFC测试、Dlg::OnInitDialog()
 	m_thread = NULL; 
 	CEdit *pEdit = (CEdit*)m_select.GetWindow(GW_CHILD);	
 	pEdit->SetReadOnly(TRUE);
-	pEdit->SetWindowText(TEXT("K-means"));
+	pEdit->SetWindowText(TEXT("ICM"));
 	m_select.AddString(TEXT("K-means"));
 	m_select.AddString(TEXT("K-means1"));
 	m_select.AddString(TEXT("GMM"));
@@ -145,6 +149,11 @@ BOOL CMFC测试、Dlg::OnInitDialog()
 	m_select.AddString(TEXT("ICM"));
 	m_select.AddString(TEXT("Test"));
 	m_select.AddString(TEXT("LeftK"));
+	CEdit *pEdit1 = (CEdit*)muti_thread_c.GetWindow(GW_CHILD);	
+	pEdit1->SetReadOnly(TRUE);
+	pEdit1->SetWindowText(TEXT("单线程"));
+	muti_thread_c.AddString("单线程");
+	muti_thread_c.AddString("多线程");
 	//showDlg = new ShowPicture(this);
 	//showDlg->Create(IDD_DIALOG1);
 	//showDlg->ShowWindow(SW_HIDE);
@@ -248,7 +257,7 @@ void CMFC测试、Dlg::OnBnClickedButton2()
 	m_btStart.SetWindowText(TEXT("正在转换..."));
 	//showDlg->ShowWindow(true);
 	//showDlg->setImg(&img);
-	   
+	img = mPic;
 	param *pparam = new param;
 	pparam->k = miK;
 	pparam->des = &img;
@@ -259,7 +268,16 @@ void CMFC测试、Dlg::OnBnClickedButton2()
 	pparam->step = mStep;
 	pparam->sub = mSub;
 	pparam->type = m_selectValue;
-	run(pparam);
+	pparam->pos = CPoint(0,100);
+	setPath(*pparam);
+	//toDo(pparam);
+	ts=clock();
+	if(muti_thread == "单线程")
+		run(pparam);
+	else if(muti_thread == "多线程")
+	{
+		toDo(pparam);
+	}
 	//AfxBeginThread(run,pparam);	
 	//CreateThread(NULL, 0, run,pparam, 0, NULL);
 	/*unsigned *ret = new unsigned;
@@ -270,53 +288,274 @@ void CMFC测试、Dlg::OnBnClickedButton2()
 
 UINT  CMFC测试、Dlg::run(LPVOID pParam)
 {
+	//Sleep(10000);
 	param *pa = (param*)pParam;
-	char buffer[1024];
 	time_t ts,te;
 	ts = clock();
 	if(pa->type == "K-means")
 	{
 		KMeans(*pa->res,*pa->des,pa->k,pa->rate,pa->step,pa->sub);
-		sprintf_s(buffer,1024,"_%d_%.2lf_%.2lf_%.2lf",pa->k,pa->rate,pa->step,pa->sub);
 	}
 	else if(pa->type == "K-means1")
 	{
 		KMeans1(*pa->res,*pa->des,pa->k,pa->rate);
-		sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
 	}
 	else if(pa->type == "GMM")
 	{
 		GMM(*pa->res,*pa->des,pa->k,pa->rate);
-		sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
 	}
 	else if(pa->type == "GMM1")
 	{
 		GMM1(*pa->res,*pa->des,pa->k,pa->rate);
-		sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
 	}
 	else if(pa->type == "SLIC")
 	{
 		int ret = SLIC(*pa->res,*pa->des,pa->k,pa->rate);
-		sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
 	}
 	else if(pa->type == "Test")
 	{
 		Test(*pa->res,*pa->des,pa->k,pa->path);
-		sprintf_s(buffer,1024,"_%d",pa->k);
 	}
 	else if(pa->type == "LeftK")
 	{
 		LeftK(*pa->res,*pa->des,pa->k,pa->path);
-		sprintf_s(buffer,1024,"_%d",pa->k);
 	}
 	else if(pa->type == "ICM")
 	{
 		ICM(*pa->res,*pa->des,pa->k,pa->rate);
-		sprintf_s(buffer,1024,"_%d",pa->k);
 	}
 	te = clock();
 
-	CString path = pa->path;
+	double span=difftime(te,ts);
+	pa->t =span;
+	pa->parent->PostMessage(WM_MESSOK,(UINT)pa,0);
+	CString str;
+	str.Format("Done! time:%.0lfms",span);
+	AfxMessageBox(str);
+	return 0;
+} 
+
+UINT CMFC测试、Dlg::run1(LPVOID pParam)
+{
+	param *pa = (param*)pParam;
+
+	if(pa->type == "K-means")
+	{
+		KMeans(*pa->res,*pa->des,pa->k,pa->rate,pa->step,pa->sub);
+		//sprintf_s(buffer,1024,"_%d_%.2lf_%.2lf_%.2lf",pa->k,pa->rate,pa->step,pa->sub);
+	}
+	else if(pa->type == "K-means1")
+	{
+		KMeans1(*pa->res,*pa->des,pa->k,pa->rate);
+		//sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
+	}
+	else if(pa->type == "GMM")
+	{
+		GMM(*pa->res,*pa->des,pa->k,pa->rate);
+		//sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
+	}
+	else if(pa->type == "GMM1")
+	{
+		GMM1(*pa->res,*pa->des,pa->k,pa->rate);
+		//sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
+	}
+	else if(pa->type == "SLIC")
+	{
+		int ret = SLIC(*pa->res,*pa->des,pa->k,pa->rate);
+		//sprintf_s(buffer,1024,"_%d_%.2lf",pa->k,pa->rate);
+	}
+	else if(pa->type == "Test")
+	{
+		Test(*pa->res,*pa->des,pa->k,pa->path);
+		//sprintf_s(buffer,1024,"_%d",pa->k);
+	}
+	else if(pa->type == "LeftK")
+	{
+		LeftK(*pa->res,*pa->des,pa->k,pa->path);
+		//(buffer,1024,"_%d",pa->k);
+	}
+	else if(pa->type == "ICM")
+	{
+		ICM(*pa->res,*pa->des,pa->k,pa->rate);
+		//(buffer,1024,"_%d",pa->k);
+	}
+	pa->parent->PostMessage(WM_MESSOK1,(UINT)pa,0);
+	return 0;
+}
+
+void CMFC测试、Dlg::toDo(param *pa)
+{
+	int width = pa->res->GetWidth();
+	int height = pa->res->GetHeight();
+	int num=9;
+	int subWidth = width/3;
+	int subHeight = height/3;
+	int widthNum = width/subWidth;
+	int heightNum = height/subHeight;
+	int k = pa->k / num +1;
+	cou=0;
+	allCou=num;
+	char buf[1024];
+	for(int i=0;i<widthNum;i++)
+	{
+		for(int j=0;j<heightNum;j++)
+		{
+			CPoint pos = CPoint(i*subWidth,j*subHeight);
+			int nWidth = subWidth;
+			int nHeight = subHeight;
+			if(i == widthNum-1){
+				nWidth = width - pos.x;
+			}
+			if(j == heightNum -1){
+				nHeight = height - pos.y;
+			}
+			CImage *res = new CImage;
+			CImage *des = new CImage;
+			GetSubImg(*pa->res,*res,pos,nWidth,nHeight);
+			//sprintf_s(buf,1024,"%s,%d,%d",savePath.GetBuffer(savePath.GetLength()),pos.x,pos.y);
+			//res->Save(buf);
+			//AfxMessageBox(buf);
+			param *pap = new param;
+			*pap=*pa;
+			pap->res=res;
+			pap->des=des;
+			pap->k=k;
+			pap->pos=pos;
+			using std::thread;
+			std::thread t(run1,pap);
+			t.detach();
+		}
+	}
+}
+
+void CMFC测试、Dlg::toDo1(param *pa)
+{
+	int width = pa->res->GetWidth();
+	int height = pa->res->GetHeight();
+	int num=9;
+	int subWidth = width/3;
+	int subHeight = height/3;
+	int widthNum = width/subWidth;
+	int heightNum = height/subHeight;
+	int k = pa->k / num +1;
+	cou=0;
+	allCou=num;
+	char buf[1024];
+	for(int i=0;i<widthNum;i++)
+	{
+		for(int j=0;j<heightNum;j++)
+		{
+			CPoint pos = CPoint(i*subWidth,j*subHeight);
+			int nWidth = subWidth;
+			int nHeight = subHeight;
+			if(i == widthNum-1){
+				nWidth = width - pos.x;
+			}
+			if(j == heightNum -1){
+				nHeight = height - pos.y;
+			}
+			CImage *res = new CImage;
+			CImage *des = new CImage;
+			GetSubImg(*pa->res,*res,pos,nWidth,nHeight);
+			//sprintf_s(buf,1024,"%s,%d,%d",savePath.GetBuffer(savePath.GetLength()),pos.x,pos.y);
+			//res->Save(buf);
+			//AfxMessageBox(buf);
+			param *pap = new param;
+			*pap=*pa;
+			pap->res=res;
+			pap->des=des;
+			pap->k=k;
+			pap->pos=pos;
+			using std::thread;
+			std::thread t(run1,pap);
+			t.detach();
+		}
+	}
+}
+void CMFC测试、Dlg::OnEnChangeEdit4()
+{
+	// TODO:  如果该控件是 RICHEDIT 控件，它将不
+	// 发送此通知，除非重写 CDialogEx::OnInitDialog()
+	// 函数并调用 CRichEditCtrl().SetEventMask()，
+	// 同时将 ENM_CHANGE 标志“或”运算到掩码中。
+
+	// TODO:  在此添加控件通知处理程序代码
+}
+LRESULT CMFC测试、Dlg::OnMessOK(WPARAM wparam,LPARAM rparam)
+{
+	param * pa = (param*)wparam;
+
+	pa->des->Save(savePath);
+	delete pa;
+	m_btStart.SetWindowText(TEXT("开始转换"));
+	m_btStart.EnableWindow(true);
+	return 0;
+}
+LRESULT CMFC测试、Dlg::OnMessOK1(WPARAM wparam,LPARAM rparam)
+{
+	param * pa = (param*)wparam;
+	CImageDC imgDC(img);
+	char buf[1024];
+	CRect rect(pa->pos.x,pa->pos.y,pa->des->GetWidth()+pa->pos.x,pa->des->GetHeight()+pa->pos.y);
+	POINT p;
+	p.x=0;
+	p.y=0;
+	pa->des->BitBlt(imgDC,rect,p);
+	cou++;
+	//sprintf_s(buf,1024,"%d",cou);
+	//pa->des->Save(GetPath(savePath,buf));
+	delete pa->res;
+	delete pa->des;
+	delete pa;
+	if(cou >= allCou)
+	{
+		img.Save(savePath);
+		m_btStart.SetWindowText(TEXT("开始转换"));
+		m_btStart.EnableWindow(true);
+		te=clock();
+		double span=difftime(te,ts);
+		CString str;
+		str.Format("Done! time:%.0lfms",span);
+		MessageBox(str);
+	}
+	return 0;
+}
+void CMFC测试、Dlg::setPath(param & pparam)
+{
+	char buffer[1024];
+	if(m_selectValue == "K-means")
+	{
+		sprintf_s(buffer,1024,"_%d_%.2lf_%.2lf_%.2lf",pparam.k,pparam.rate,pparam.step,pparam.sub);
+	}
+	else if(m_selectValue == "K-means1")
+	{
+		sprintf_s(buffer,1024,"_%d_%.2lf",pparam.k,pparam.rate);
+	}
+	else if(pparam.type == "GMM")
+	{
+		sprintf_s(buffer,1024,"_%d_%.2lf",pparam.k,pparam.rate);
+	}
+	else if(pparam.type == "GMM1")
+	{
+		sprintf_s(buffer,1024,"_%d_%.2lf",pparam.k,pparam.rate);
+	}
+	else if(pparam.type == "SLIC")
+	{
+		sprintf_s(buffer,1024,"_%d_%.2lf",pparam.k,pparam.rate);
+	}
+	else if(pparam.type == "Test")
+	{
+		sprintf_s(buffer,1024,"_%d",pparam.k);
+	}
+	else if(pparam.type == "LeftK")
+	{
+		sprintf_s(buffer,1024,"_%d",pparam.k);
+	}
+	else if(pparam.type == "ICM")
+	{
+		sprintf_s(buffer,1024,"_%d",pparam.k);
+	}
+	CString path = pparam.path;
 	int i;
 	for(i=path.GetLength();i>0;i--)
 	{
@@ -325,8 +564,7 @@ UINT  CMFC测试、Dlg::run(LPVOID pParam)
 			break;
 		}
 	}
-	//path = path.Left(i)+pa->type+CString(buffer)+path.Right(path.GetLength()-i);
-	CString left =  path.Left(i)+pa->type+CString(buffer);
+	CString left =  path.Left(i)+pparam.type+CString(buffer);
 	CString right = path.Right(path.GetLength()-i);
 	CString a;
 	int t = 1;
@@ -340,30 +578,5 @@ UINT  CMFC测试、Dlg::run(LPVOID pParam)
 		}
 		t++;
 	}
-	double span=difftime(te,ts);
-	pa->t =span;
-	pa->des->Save(path);
-	pa->parent->PostMessage(WM_MESSOK,(UINT)pa,0);
-	CString str;
-	str.Format("Done! time:%.0lfms",span);
-	AfxMessageBox(str);
-	return 0;
-} 
-
-void CMFC测试、Dlg::OnEnChangeEdit4()
-{
-	// TODO:  如果该控件是 RICHEDIT 控件，它将不
-	// 发送此通知，除非重写 CDialogEx::OnInitDialog()
-	// 函数并调用 CRichEditCtrl().SetEventMask()，
-	// 同时将 ENM_CHANGE 标志“或”运算到掩码中。
-
-	// TODO:  在此添加控件通知处理程序代码
-}
-LRESULT CMFC测试、Dlg::OnMessOK(WPARAM wparam,LPARAM rparam)
-{
-	param * pa = (param*)wparam;
-	delete pa;
-	m_btStart.SetWindowText(TEXT("开始转换"));
-	m_btStart.EnableWindow(true);
-	return 0;
+	savePath = path;
 }

@@ -66,7 +66,7 @@ void Test(CImage &res,CImage &des,int k,CString path)
 			maxSub[i][j] = 100*(maxSub[i][j]/Max);	
 		}
 	}
-	unsigned short r,g,b;
+//	unsigned short r,g,b;
 	for(int i=0;i<width;i++)
 	{
 		for(int j=0;j<height;j++)

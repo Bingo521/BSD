@@ -5,8 +5,9 @@
 #pragma once
 #include "afxwin.h"
 #include "ShowPicture.h"
-
+#include<thread>
 // CMFC测试、Dlg 对话框
+struct param;
 class CMFC测试、Dlg : public CDialogEx
 {
 // 构造
@@ -46,16 +47,27 @@ public:
 	double mlfRate;
 	afx_msg void OnEnChangeEdit4();
 	LRESULT OnMessOK(WPARAM ,LPARAM);
+	LRESULT OnMessOK1(WPARAM ,LPARAM);
 	double mSub;
 	CImage img;
 	CWinThread * m_thread;
 public:
 	static UINT run(LPVOID pParam);
+	static UINT run1(LPVOID pParam);
+	void toDo(param *pa);
+	void toDo1(param *pa);
 	double mStep;
 	CButton m_btStart;
 	CComboBox m_select;
 	CString m_selectValue;
 	CString m_ini_path;
+	int cou;
+	int allCou;
+	CString savePath;
+	void setPath(param & pparam);
+	CString muti_thread;
+	CComboBox muti_thread_c;
+	time_t ts,te;
 };
 struct param
 {
@@ -69,4 +81,5 @@ struct param
 	CString path;
 	CString type;
 	double t;
+	CPoint pos;
 };

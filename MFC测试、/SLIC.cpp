@@ -39,7 +39,8 @@ int SLIC(CImage &res,CImage &des,int k,double M)
 	AfxMessageBox(str);*/
 
 	Image2Lab(des,lab);
-	Avg_n2(lab,width,height,1);
+	//Avg_n2(lab,width,height,1);
+	n_avg_2_k_(fenClass_c,width,height,k);
 	GetImageGrad(lab,grad,width,height);
 	SLIC_Core(lab,grad,fenClass_c,width,height,k,M);
 	MergeClassByColor(lab,fenClass_c,width,height,k);

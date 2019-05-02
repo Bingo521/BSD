@@ -102,9 +102,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GMM.h" />
+    <ClInclude Include="ICM.h" />
     <ClInclude Include="KMeans.h" />
     <ClInclude Include="LeftK.h" />
     <ClInclude Include="LeftK2.h" />
+    <ClInclude Include="matrix.h" />
     <ClInclude Include="MFC测试、.h" />
     <ClInclude Include="MFC测试、Dlg.h" />
     <ClInclude Include="Resource.h" />
@@ -119,6 +121,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GMM.cpp" />
+    <ClCompile Include="ICM.cpp" />
     <ClCompile Include="KMeans.cpp" />
     <ClCompile Include="LeftK.cpp" />
     <ClCompile Include="LeftK2.cpp" />

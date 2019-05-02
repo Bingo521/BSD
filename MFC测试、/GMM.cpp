@@ -28,6 +28,9 @@ int GMM(CImage &res,CImage &des,int k,double M)
 	Image2Lab(des,lab);
 	GetImageGrad(lab,grad,width,height);
 	SLIC_Core(lab,grad,fenClass_c,width,height,k,M);
+	MergeClassByColor(lab,fenClass_c,width,height,k);
+	delete_empty_calss(fenClass_c,width,height,k);
+	//n_avg_2_k_(fenClass_c,width,height,k);
 	GMM_Core(lab,fenClass_c,width,height,k);
 	MergeClassByColor(lab,fenClass_c,width,height,k);
 	DrawBorder1(des,fenClass_c,width,height);

@@ -63,6 +63,12 @@
     <ClInclude Include="GMM.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="ICM.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="matrix.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MFC测试、.cpp">
@@ -102,6 +108,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="GMM.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ICM.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

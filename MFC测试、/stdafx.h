@@ -44,6 +44,7 @@
 #include <io.h>
 #include <time.h> 
 #include <cmath>
+#include <string.h>
 #include "GMM.h"
 #include "KMeans.h"
 #include "_RGB2Lab.h"
@@ -53,10 +54,13 @@
 #include "SLIC.h"
 #include "util.h"
 #include "ICM.h"
+#include "matrix.h"
 #define lim0 1.5
+#define LIM0 1e-5
 
 #define WM_BASE 10000
 #define WM_MESSOK (WM_BASE +1)
+#define WM_MESSOK1 (WM_BASE + 2)
 
 #define P2D_ITE map<Point,double>::iterator
 #define D2SP_ITE map<double,set<Point>>::iterator
@@ -64,7 +68,7 @@
 #define INFF 9223372036854775807 
 #define INFI 0x3f3f3f3f
 #define INFLL  9223372036854775807
-#define LABEL3
+#define LABEL5
 #ifdef LABEL5
 	#define LABEL_NUM 5
 	#define LABEL_NUM2 25
