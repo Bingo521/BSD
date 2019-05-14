@@ -147,6 +147,7 @@ BOOL CMFC²âÊÔ¡¢Dlg::OnInitDialog()
 	m_select.AddString(TEXT("GMM1"));
 	m_select.AddString(TEXT("SLIC"));
 	m_select.AddString(TEXT("ICM"));
+	m_select.AddString(TEXT("ICM_Eigen"));
 	m_select.AddString(TEXT("Test"));
 	m_select.AddString(TEXT("LeftK"));
 	CEdit *pEdit1 = (CEdit*)muti_thread_c.GetWindow(GW_CHILD);	
@@ -323,6 +324,10 @@ UINT  CMFC²âÊÔ¡¢Dlg::run(LPVOID pParam)
 	else if(pa->type == "ICM")
 	{
 		ICM(*pa->res,*pa->des,pa->k,pa->rate);
+	}else if(pa->type == "ICM_Eigen")
+	{
+		AfxMessageBox("wait");
+		return 0;
 	}
 	te = clock();
 

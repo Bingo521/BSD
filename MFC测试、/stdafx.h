@@ -45,6 +45,7 @@
 #include <time.h> 
 #include <cmath>
 #include <string.h>
+#include "Eigen/Dense"
 #include "GMM.h"
 #include "KMeans.h"
 #include "_RGB2Lab.h"
@@ -68,7 +69,8 @@
 #define INFF 9223372036854775807 
 #define INFI 0x3f3f3f3f
 #define INFLL  9223372036854775807
-#define LABEL5
+#define NOTUSERGB
+#define LABEL3
 #ifdef LABEL5
 	#define LABEL_NUM 5
 	#define LABEL_NUM2 25

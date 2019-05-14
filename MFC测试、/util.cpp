@@ -1,6 +1,8 @@
 #include "stdafx.h"
+//
 using namespace std;
-
+using namespace Eigen;
+MyLog logs("123.txt");
 double GetAngle(double ax,double ay,double bx,double by)
 {
     double tt,kk,sum;
@@ -1007,7 +1009,7 @@ void MergeClassByColor(const vector<vector<float>> &lab,vector<int> &fenClass_c,
 				}
 			}
 
-			if(abs(maxx - minx - maxy + miny) < MinDisY)
+			if(abs(maxx - minx - maxy + miny) < MinDisY || point_r.size() < MinPixelNum)
 			{
 				Tag &tag = new_class[c];
 				int &c_num = new_class_num[c];
@@ -2407,10 +2409,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int &k)
 {
 	double T = 1.5;
-	double bate = 1;
+	double bate = 1.5;
 	int sz = width * height;
 	int S = sqrt(sz / k)+0.5;
-	double powpi = pow(2*Pi,LABEL_NUM);
+	double powpi = pow(2*Pi,LABEL_NUM/2.0);
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
 	vector<vector<double>> D(k,vector<double>(LABEL_NUM2,0));
 	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2)); 
@@ -2422,32 +2424,32 @@ void ICM_Core(const vector<vector<float>> &lab,
 	vector<bool> fenClass_is(k);
 	vector<double> ans(1);
 	
-	//CMatrix matrix(LABEL_NUM);
-	//CMatrixEx matrixEx(LABEL_NUM);
 	MatrixQuick mat(LABEL_NUM);
-
-	int Max_Time = S;
+#ifdef LABEL3
+	vector<vector<double>> xy(k,vector<double>(2));
+#endif
+	int Max_Time = S * 2;
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
+	vector<double> tP(k);
 	vector<double> dv(k);
 	vector<double> sub(LABEL_NUM);
-	int s_8[N];
+	int s_8[8];
 	int spos = 0;
 	while(Max_Time -- )
 	{
+		//先将类像素点计数c_num、期望E、方差D赋值成0
+		ZeroMemory(&c_num[0],sizeof(int)*k);
 		for(int i = 0 ; i < k ; i ++)
 		{
-			for(int j = 0 ; j < LABEL_NUM;j++)
-			{
-				E[i][j]=0;
-			}
-			for(int j = 0; j < LABEL_NUM2;j++)
-			{
-				D[i][j]=0;
-			}
-			c_num[i]=0;
+			ZeroMemory(&E[i][0],sizeof(double)*LABEL_NUM);
+			ZeroMemory(&D[i][0],sizeof(double)*LABEL_NUM2);
 		}
+#ifdef LAEBL3
+		ZeroMemory(&xy[0],sizeof(double) * k);
+#endif
+		//求每类样本和
 		for(int i = 0 ; i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j++)
@@ -2457,6 +2459,10 @@ void ICM_Core(const vector<vector<float>> &lab,
 				E[c][0] += lab[0][pos];
 				E[c][1] += lab[1][pos];
 				E[c][2] += lab[2][pos];
+#ifdef LABEL3
+		xy[c][0]+=i;
+		xy[c][1]+=j;
+#endif
 	#ifdef LABEL5
 				E[c][3] += i;
 				E[c][4] += j;
@@ -2464,6 +2470,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 				c_num[c] ++;
 			}
 		}
+		//求均值，即期望
 		for(int i = 0 ; i < k ; i ++)
 		{
 			if(c_num[i] == 0)
@@ -2471,11 +2478,17 @@ void ICM_Core(const vector<vector<float>> &lab,
 			E[i][0] /= c_num[i];
 			E[i][1] /= c_num[i];
 			E[i][2] /= c_num[i];
+#ifdef LABEL3
+			xy[i][0] /= c_num[i];
+			xy[i][1] /= c_num[i];
+#endif
 	#ifdef LABEL5
 			E[i][3] /= c_num[i];
 			E[i][4] /= c_num[i];
 	#endif
 		}
+
+		//求协方差矩阵的和
 		for(int i = 0 ; i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j++)
@@ -2489,7 +2502,6 @@ void ICM_Core(const vector<vector<float>> &lab,
 				sub[3] = i			-	E[c][3];
 				sub[4] = j			-	E[c][4];
 	#endif
-				//matrixEx.mul(e,e,LABEL_NUM,1,LABEL_NUM,d);
 				mat.Mul(&sub[0],&sub[0],LABEL_NUM,1,LABEL_NUM,&d[0]);
 				for(int w = 0 ; w < LABEL_NUM2 ;w ++)
 				{
@@ -2497,6 +2509,7 @@ void ICM_Core(const vector<vector<float>> &lab,
 				}
 			}
 		}
+		//求均值，
 		for(int i = 0 ; i < k ; i ++)
 		{
 			if(c_num[i] == 0)
@@ -2505,6 +2518,244 @@ void ICM_Core(const vector<vector<float>> &lab,
 			{
 				D[i][w] /= c_num[i];
 			}
+		}
+		memcpy_s(&fenClass_t[0],sizeof(int) * sz,&fenClass_c[0],sizeof(int) * sz);
+		for(int i =0 ; i < k ; i ++)
+		{
+			
+			if(c_num[i] == 0)
+			{
+				continue;
+			}
+			fenClass_is[i] = 0;	
+			dv[i] = abs(mat.Det(&D[i][0]));
+			if(dv[i] < 1e-10)
+			{
+				/*for(int ii=0;ii<LABEL_NUM;ii++)
+				{
+					D[i][ii*LABEL_NUM + ii]+=1e-4;
+				}
+				mat.Inverse(&D[i][0],&D_[i][0]);
+				dv[i] = abs(mat.Det(&D[i][0]));*/
+				fenClass_is[i] = 1;
+				//dv[i] = 0;
+			}else{
+				mat.Inverse(&D[i][0],&D_[i][0]);
+			}
+			
+		}
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_t[pos];
+				if(c<0 || c>=k)
+				{
+					continue;
+				}
+				if(fenClass_is[c])
+					continue;
+				//存储pos周围的八邻域类情况
+				for(int w = 0 ; w < 8 ; w++)
+				{
+					int nx = i + Move8[w][0];
+					int ny = j + Move8[w][1];
+					
+					if(nx < 0 || ny < 0 || nx >=width || ny >= height)
+						continue;
+					int npos = nx * height + ny;
+					int nc = fenClass_t[npos];
+					if(num[nc] == 0)
+					{
+						s_8[spos] = nc;
+						spos ++;
+					}
+					num[nc] ++;
+				}
+				
+				int tc = c;
+				if(spos > 1 ){
+					double z = 0;
+					for(int w = 0 ; w < spos ; w ++)
+					{
+						int tnum = num[s_8[w]];
+						double b = tnum*bate;
+						P[s_8[w]] = exp(b);//exp(-1.0 * b / T);
+						//z += tP[s_8[w]];
+					}
+					double other=1;
+					//z+= k - spos;
+					/*other = 1 / z;
+					for(int w = 0 ; w < spos ; w ++)
+					{
+						P[s_8[w]] = tP[s_8[w]] / z;
+					}*/
+				
+					double max_pi = -INFI;
+					for(int w = 0 ; w < k ; w ++)
+					{
+						if(dv[w] == 0)
+						{
+							continue;
+						}
+						double preP = other;
+						if(num[w])
+							preP = P[w];
+	#ifdef LABEL5
+						double MaxX = E[w][3]+S;
+						double MinX = E[w][3]-S;
+						double MaxY = E[w][4]+S;
+						double MinY = E[w][4]-S;
+						sub[3] = i - E[w][3];
+						sub[4] = j - E[w][4];
+	#endif
+	#ifdef LABEL3
+						double MaxX = xy[w][0]+S;
+						double MinX = xy[w][0]-S;
+						double MaxY = xy[w][1]+S;
+						double MinY = xy[w][1]-S;
+	#endif
+						if(i > MaxX || i < MinX || j > MaxY || j < MinY)
+							continue;
+						sub[0] = lab[0][pos] - E[w][0];
+						sub[1] = lab[1][pos] - E[w][1];
+						sub[2] = lab[2][pos] - E[w][2];
+
+						mat.Mul(&sub[0],&D_[w][0],1,LABEL_NUM,LABEL_NUM,&t[0]);
+						mat.Mul(&t[0],&sub[0],1,LABEL_NUM,1,&ans[0]);
+						double pi = (preP / sqrt(dv[w]) * exp(-0.5 * ans[0]));  
+						if(pi > max_pi)
+						{
+							tc = w;
+							max_pi = pi;
+						}
+					}
+				}
+				fenClass_c[pos] = tc;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					num[s_8[w]] = 0;
+				}
+				spos = 0;
+			}
+		}
+	}
+	
+}
+
+void ICM_CoreUseEigen(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k)
+{
+	double T = 1.5;
+	double bate = 1;
+	int sz = width * height;
+	int S = sqrt(sz / k)+0.5;
+	double powpi = pow(2*Pi,LABEL_NUM);
+	vector<VectorXd> E(k,VectorXd(LABEL_NUM));
+
+	vector<MatrixXd> D(k,MatrixXd(LABEL_NUM,LABEL_NUM));
+	vector<MatrixXd> D_(k,MatrixXd(LABEL_NUM,LABEL_NUM));
+	vector<int> c_num(k,0);
+	
+	vector<int> fenClass_t(sz);
+	int Max_Time = 10;
+	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	double rate = 0.0001;
+	vector<int> num(k,0);
+	vector<double> P(k);
+	vector<double> dv(k);
+	VectorXd sub(LABEL_NUM);
+	MatrixXd tmpMat(LABEL_NUM,LABEL_NUM);
+	MatrixXd e(LABEL_NUM,LABEL_NUM);
+#ifdef LABEL5
+	e<< 1,0,0,0,0,
+		0,1,0,0,0,
+		0,0,1,0,0,
+		0,0,0,1,0,
+		0,0,0,0,1;
+#endif
+#ifdef LABEL3
+	e<< 1,0,0,
+		0,1,0,
+		0,0,1;
+#endif
+	e*=rate;
+	int s_8[N];
+	int spos = 0;
+	while(Max_Time -- )
+	{
+		//初始化期望、方差、计数
+		for(int i = 0 ; i < k ; i ++)
+		{
+			for(int j = 0 ; j < LABEL_NUM;j++)
+			{
+				E[i](j)=0;
+			}
+			for(int j = 0; j < LABEL_NUM;j++)
+			{
+				for(int w = 0; w < LABEL_NUM;w++)
+				D[i](j,w)=0;
+			}
+			c_num[i]=0;
+		}
+		//求期望
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_c[pos];
+				E[c](0)+= lab[0][pos];
+				E[c](1) += lab[1][pos];
+				E[c](2) += lab[2][pos];
+	#ifdef LABEL5
+				E[c](3) += i;
+				E[c](4) += j;
+	#endif
+				c_num[c] ++;
+			}
+		}
+		
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			E[i](0) /= c_num[i];
+			E[i](1) /= c_num[i];
+			E[i](2) /= c_num[i];
+	#ifdef LABEL5
+			E[i](3) /= c_num[i];
+			E[i](4) /= c_num[i];
+	#endif
+		}
+
+		//求方差
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_c[pos];
+				sub[0] = lab[0][pos]	-	E[c][0];
+				sub[1] = lab[1][pos]	-	E[c][1];
+				sub[2] = lab[2][pos]	-	E[c][2];
+	#ifdef LABEL5
+				sub[3] = i			-	E[c][3];
+				sub[4] = j			-	E[c][4];
+	#endif
+				D[c]+= sub *  sub.transpose();
+
+			}
+		}
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			D[i]/=c_num[i];
 		}
 		for(int i = 0 ; i < sz ; i++){
 			fenClass_t[i] = fenClass_c[i];		
@@ -2516,24 +2767,21 @@ void ICM_Core(const vector<vector<float>> &lab,
 			{
 				continue;
 			}
-			fenClass_is[i] = 0;
-			//bool not_zero = matrixEx.LUP_solve_inverse(D[i],D_[i]);
-			bool not_zero = mat.Inverse(&D[i][0],&D_[i][0]);
-			dv[i] = abs(mat.Det(&D[i][0]));
-			if(!not_zero || dv[i] < 1e-10)
-			{
-				//dv[i] = abs(matrix.det(LABEL_NUM,D[i]));	
-				for(int ii=0;ii<LABEL_NUM;ii++)
-				{
-					D[i][ii*LABEL_NUM + ii]+=1e-5;
-				}
-				not_zero = mat.Inverse(&D[i][0],&D_[i][0]);
-				dv[i] = abs(mat.Det(&D[i][0]));
-				//fenClass_is[i] = 1;
-				//dv[i] = 0;
+			//CString str;
+			/*str.Format("D=[%.5lf,%.5lf,%.5lf][%.5lf,%.5lf,%.5lf][%.5lf,%.5lf,%.5lf]",D[i](0,0),D[i](0,1),D[i](0,2),
+																					 D[i](1,0),D[i](1,1),D[i](1,2),
+																					 D[i](2,0),D[i](2,1),D[i](2,2));*/
+			//AfxMessageBox(str);
+			dv[i] = abs(D[i].determinant());
+			if(dv[i] < 1e-8){	
+				D[i]+=e;
 			}
+			D_[i] = D[i].inverse();
+			dv[i] = abs(D[i].determinant());
 			
 		}
+
+		//重新划分类
 		for(int i = 0 ; i < width ; i ++)
 		{
 			for(int j = 0 ; j < height ; j++)
@@ -2545,8 +2793,6 @@ void ICM_Core(const vector<vector<float>> &lab,
 				{
 					continue;
 				}
-				if(fenClass_is[c])
-					continue;
 				//存储pos周围的八邻域类情况
 				for(int w = 0 ; w < 8 ; w++)
 				{
@@ -2593,11 +2839,16 @@ void ICM_Core(const vector<vector<float>> &lab,
 					sub[3] = i - E[c][3];
 					sub[4] = j - E[c][4];
 #endif
-					//matrixEx.mul(d,D_[c],1,LABEL_NUM,LABEL_NUM,t);
-					//matrixEx.mul(t,d,1,LABEL_NUM,1,ans);
-					mat.Mul(&sub[0],&D_[c][0],1,LABEL_NUM,LABEL_NUM,&t[0]);
-					mat.Mul(&t[0],&sub[0],1,LABEL_NUM,1,&ans[0]);
-					double pi = (P[c] / powpi / sqrt(dv[c]) * exp(-0.5 * ans[0]));  
+					/*CString str;
+					str.Format("sub.t= %.5lf  %.5lf  %.5lf  D_=%.5lf  %.5lf  %.5lf %.5lf  %.5lf  %.5lf  %.5lf  %.5lf  %.5lf sub=%.5lf  %.5lf  %.5lf ",
+						sub.transpose()[0],sub.transpose()[1],sub.transpose()[2],
+						D_[c](0,0),D_[c](0,1),D_[c](0,2),
+						D_[c](1,0),D_[c](1,1),D_[c](1,2),
+						D_[c](2,0),D_[c](2,1),D_[c](2,2),
+						sub[0],sub[1],sub[2]);
+					AfxMessageBox(str);*/
+					double ans = exp( -0.5 * (sub.transpose() * D_[c]* sub)(0,0) );
+					double pi = (P[c] / powpi / sqrt(dv[c]) *  ans);  
 					if(pi > max_pi)
 					{
 						tc = c;
@@ -2839,4 +3090,67 @@ void LogDebug(vector<vector<double>>&pi,int width,int height,int k,CString name,
 	{
 		fclose(files[i]);
 	}
+}
+
+void DrawBorderWidthAvgColor(CImage &des,vector<int> &fenClass_c,int width,int height)
+{
+	int sz = width * height;
+	byte * blt = (byte *)des.GetBits();
+	int plt = des.GetPitch();
+	vector<bool> is_visit(sz,0);
+	queue<CPoint> QUE;
+	queue<CPoint> points;
+
+#define PUSHQUE(x,y) QUE.push(CPoint(x,y));points.push(CPoint(x,y));\
+	r += *(blt + plt*y+ x*3);\
+	g += *(blt + plt*y+ x*3 + 1);\
+	b += *(blt + plt*y+ x*3 + 2);
+	//CString str;str.Format("pt=%d,(%d,%d)",plt,x,y);logs.Debug(str.GetBuffer(str.GetLength()));
+
+#define SETCOLOR(x,y)\
+	*(blt + plt*y+ x*3) = r;\
+	*(blt + plt*y+ x*3 + 1) = g;\
+	*(blt + plt*y+ x*3 + 2) = b;
+	int Move[][2]={0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	double r,g,b;
+	for(int i = 0; i < sz ; i ++)
+	{
+		if(is_visit[i])
+			continue;
+		r=0;b=0;g=0;
+		int x = i/height;
+		int y = i%height;
+		PUSHQUE(x,y)
+		int c = fenClass_c[i];
+		is_visit[i] = 1;
+		while(!QUE.empty())
+		{
+			CPoint p = QUE.front();
+			QUE.pop();
+			for(int j = 0 ; j < 8;j ++)
+			{
+				int nx  = p.x + Move[j][0];
+				int ny  = p.y + Move[j][1];
+				int npos = nx* height + ny;
+				if(nx < 0 || nx >= width || ny < 0 || ny >= height || is_visit[npos] || c != fenClass_c[npos])
+					continue;
+				PUSHQUE(nx,ny) 
+				is_visit[npos] = 1;
+			}
+		}
+		r/=points.size();
+		g/=points.size();
+		b/=points.size();
+		while(!points.empty())
+		{
+			CPoint p = points.front();
+			points.pop();
+			SETCOLOR(p.x,p.y);
+		}
+	}
+}
+
+void LogDebug(string str)
+{
+	logs.Debug(str);
 }

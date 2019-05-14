@@ -5,6 +5,23 @@ using namespace std;
 #define getNext(i,m,n)  (((i)%(n))*(m) + (i)/(n))
 #define getPre(i,m,n)   (((i)%(m))*(n) + (i)/(m))
 
+class MyLog{
+	string fileName;
+	const string defaultFileName;
+	FILE *file;
+public:
+	MyLog(string fileName):file(NULL){this->fileName = fileName;int err = fopen_s(&file,fileName.c_str(),"w");}
+	MyLog():defaultFileName("Logdefault.txt"),file(NULL){fileName = defaultFileName;int err = fopen_s(&file,fileName.c_str(),"w");}
+	void Debug(string str){
+		fwrite(str.c_str(),1,str.size(),file);
+		fwrite("\r\n",1,2,file);
+	}
+	~MyLog(){
+		fclose(file);
+	}
+};
+
+
 struct TagEx
 {
 	double r,g,b;
@@ -83,6 +100,7 @@ struct DPoint{
 		this->num = num;
 	}
 };
+
 
 /*
 CMatrix为计算出逆矩阵的类，初始化传入一个参数n为n*n矩阵，用inverse
@@ -535,6 +553,11 @@ void ICM_Core(const vector<vector<float>> &lab,
 				int width,
 				int height,
 				int &k);
+void ICM_CoreUseEigen(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k);
 void Avg_n2(vector<vector<float>> & lab,int width,int height,int n);
 
 void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k);
@@ -544,3 +567,5 @@ void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k);
 void n_avg_2_k_(vector<int> &fenClass_c,int width,int height,int &k);
 
 void LogDebug(vector<vector<double>>&,int width,int height,int k,CString name,int t);
+
+void LogDebug(CString str);

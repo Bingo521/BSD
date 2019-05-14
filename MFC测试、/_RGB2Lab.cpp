@@ -38,6 +38,12 @@ void RGB2XYZ(
 }
 void RGB2LAB(const int& sR, const int& sG, const int& sB, float& lval, float& aval, float& bval)
 {
+#ifdef USERGB
+	lval = sR;
+	aval = sG;
+	bval = sB;
+	return ;
+#endif
 	//------------------------
 	// sRGB to XYZ conversion
 	//------------------------
