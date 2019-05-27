@@ -2,6 +2,8 @@
 //
 using namespace std;
 using namespace Eigen;
+
+extern CImage debugImg;
 MyLog logs("123.txt");
 double GetAngle(double ax,double ay,double bx,double by)
 {
@@ -2014,9 +2016,9 @@ void GMM_Core(	const vector<vector<float>> &lab,
 			tmp_pi[w] = sum_tmp;
 			sum_nk += sum_tmp;
 		}
-		CString str;
+		/*CString str;
 		str.Format("%lf %d",sum_nk,sz);
-		AfxMessageBox(str);
+		AfxMessageBox(str);*/
 		//求u
 		for(int w = 0 ; w < k; w ++)
 		{
@@ -2115,6 +2117,201 @@ void GMM_Core(	const vector<vector<float>> &lab,
 	//}
 	//fclose(file);
 	//LogDebug(fenClass_c,width,height,"Log");
+}
+void GMM_Core_(	const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k)
+{
+	//常量定义
+	const int sz = width * height;
+	const int kInt = sizeof(int) * k;
+	const int kDouble = sizeof(double) * k;
+	const int szDouble = sizeof(double) * sz;
+	const int labelDouble = sizeof(double) * LABEL_NUM;
+	const int label2Double = sizeof(double) * LABEL_NUM2;
+	const double pow_pi = pow(2*Pi,LABEL_NUM / 2.0);
+	//临时变量定义
+	int tmp;
+	vector<double> sub1(LABEL_NUM);
+	vector<double> sub2(LABEL_NUM2);
+	double ans;
+	//专用变量定义
+	int Max_Time = 30;
+	vector<vector<double>> P(k,vector<double>(sz));
+	vector<double> Q(k);
+	vector<vector<double>> E(k,vector<double>(LABEL_NUM));
+	vector<vector<double>> D(k,vector<double>(LABEL_NUM2));
+	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2));
+	vector<double> Det(k);
+	vector<double> Nk(k);
+	MatrixQuick mat(LABEL_NUM);
+	
+	//初始化概率
+	for(int i = 0 ; i< k ; i ++)
+	{
+		ZeroMemory(&P[i][0],szDouble);
+	}
+	for(int i = 0 ; i < sz ; i++)
+	{
+		tmp = fenClass_c[i];
+		P[tmp][i] = 1;
+	}
+	while(Max_Time --)
+	{
+		//清0
+		ZeroMemory(&Nk[0],kDouble);
+		for(int i = 0; i < k ; i ++ )
+		{
+			ZeroMemory(&E[i][0],labelDouble);
+			ZeroMemory(&D[i][0],label2Double);
+		}
+		//求Nk
+		for(int i = 0; i <k;i++)
+		{
+			for(int j=0;j<sz;j++)
+			{
+				Nk[i]+=P[i][j];
+			}
+		}
+		//debug sum(Nk)
+		double sum_Nk=0;
+		for(int i = 0 ; i < k ;i ++)
+		{
+			sum_Nk += Nk[i];
+		}
+		if(fabs(sum_Nk - sz ) > 1){
+			CString str;
+			str.Format("%lf %d,",sum_Nk,sz);
+			AfxMessageBox(str);
+		}
+		//end
+
+		//求E
+		for(int i = 0 ; i < width ;i++)
+		{
+			for(int j = 0 ; j < height ;j++)
+			{
+				int pos = i*height + j ;
+				for(int w = 0 ; w < k ; w++)
+				{
+					E[w][0] += lab[0][pos]*P[w][pos];
+					E[w][1] += lab[1][pos]*P[w][pos];
+					E[w][2] += lab[2][pos]*P[w][pos];
+#ifdef LABEL5
+					E[w][3] += i*P[w][pos];
+					E[w][4] += j*P[w][pos];
+#endif
+				}
+			}
+		}
+		for(int i=0;i<k;i++)
+		{
+			if(Nk[i] == 0)
+				continue;
+			for(int j = 0 ; j < LABEL_NUM;j++)
+			{
+				E[i][j] /=Nk[i];
+			}
+		}
+		//求D
+		for(int i = 0; i < sz; i++)
+		{
+			int x = i / height;
+			int y = i % height;
+			for(int j = 0; j < k ; j++)
+			{
+				sub1[0] = lab[0][i] - E[j][0];
+				sub1[1] = lab[1][i] - E[j][1];
+				sub1[2] = lab[2][i] - E[j][2];
+#ifdef LABEL5
+				sub1[3] = x - E[j][3];
+				sub1[4] = y - E[j][4];
+#endif
+				mat.Mul(&sub1[0],&sub1[0],LABEL_NUM,1,LABEL_NUM,&sub2[0]);
+				for(int w = 0 ; w < LABEL_NUM2; w++)
+				{
+					D[j][w]+= sub2[w]*P[j][i];
+				}
+			}
+		}
+		for(int i = 0; i < k ; i ++)
+		{
+			if(Nk[i] == 0)
+				continue;
+			for(int j = 0 ; j < LABEL_NUM2;j++)
+			{
+				D[i][j] /= Nk[i];
+			}
+		}
+		//求逆矩阵
+		for(int i = 0 ; i < k ; i++)
+		{
+			Det[i] = mat.Det(&D[i][0]);
+			if(Det[i] < 1e-10)
+			{
+				for(int ii = 0 ;ii < LABEL_NUM;ii++)
+				{
+					D[i][ii*LABEL_NUM + ii] += 1e-4;
+				}
+				Det[i] = mat.Det(&D[i][0]);
+			}
+			Det[i] = fabs(Det[i]);
+			mat.Inverse(&D[i][0],&D_[i][0]);
+		}
+		//求先验概率
+		for(int i = 0 ; i < k ;i++)
+		{
+			Q[i] = Nk[i] / sz;
+		}
+		//后验概率
+		for(int i = 0 ; i < sz ; i++)
+		{
+			int x = i / height;
+			int y = i % height;
+			for(int j = 0 ; j < k ; j++)
+			{
+				sub1[0] = lab[0][i] - E[j][0];
+				sub1[1] = lab[1][i] - E[j][1];
+				sub1[2] = lab[2][i] - E[j][2];
+#ifdef LABEL5
+				sub1[3] = x - E[j][3];
+				sub1[4] = y - E[j][4];
+#endif
+				mat.Mul(&sub1[0],&D_[j][0],1,LABEL_NUM,LABEL_NUM,&sub2[0]);
+				mat.Mul(&sub2[0],&sub1[0],1,LABEL_NUM,1,&ans);
+				P[j][i] = Q[j] / pow_pi / sqrt(Det[j]) * exp(-0.5 * ans);
+			}
+		}
+		//归一化
+		for(int i = 0 ; i < sz ; i ++)
+		{
+			double sum = 0 ;
+			for(int j = 0 ; j < k ; j++)
+			{
+				sum+=P[j][i];
+			}
+			for(int j = 0; j < k ;j++)
+			{
+				P[j][i] /= sum;
+			}
+		}
+	}
+	for(int i = 0 ; i < sz ;i ++)
+	{
+		int c = 0;
+		double MaxPi = P[0][i];
+		for(int j = 1 ; j < k ;j ++)
+		{
+			if(P[j][i] > MaxPi)
+			{
+				MaxPi = P[j][i];
+				c = j;
+			}
+		}
+		fenClass_c[i] = c;
+	}
 }
 
 void GMM_Core1(	const vector<vector<vector<float>>> &lab,
@@ -2402,15 +2599,177 @@ void KMeans_Core(	const vector<vector<vector<float>>> &lab,
 	}
 }
 
+void KMeans_Core(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k,
+				double M)
+{
+	int sz = width * height;
+	int MaxTime = 30;
+	vector<Tag> k_tags;
+	fenClass_c = vector<int>(sz);
+	int pixel_num = width * height;
+	int S = (int)sqrt(pixel_num / k) + 1;
+	for(int i = 0 ; i * S < width ; i++ )
+	{
+		for(int j = 0 ; j * S < height ; j++)
+		{
+			int si = i * S;
+			int sj = j * S;
+			k_tags.push_back(Tag(0,0,0,si,sj));
+		}
+	}
+	k = k_tags.size();
+	int Move[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1}; 
+	
+	vector<vector<CPoint>> vec(k);
+	while( MaxTime --)
+	{
+		for(int i=0;i<k;i++)
+		{
+			vec[i].clear();
+		}
+		for(int i=0;i<width;i++)
+		{
+			for(int j=0;j<height;j++)
+			{
+				int c=0;
+				double sub = INFF;
+				int pos = i * height + j;
+				for(int w=0;w<k;w++)
+				{
+					double subr = lab[0][pos]-k_tags[w].r;
+					double subg = lab[1][pos]-k_tags[w].g;
+					double subb = lab[2][pos]-k_tags[w].b;
+					int subx = i-k_tags[w].x;
+					int suby = j-k_tags[w].y;
+					double nowSub = (subr*subr + subg*subg + subb*subb + subx*subx*M + suby*suby*M);
+
+					if(sub >nowSub)
+					{
+						c = w;
+						sub = nowSub;
+					}
+				}
+				vec[c].push_back(CPoint(i,j));
+			}
+		}
+		for(int i=0;i<k;i++)
+		{
+			int len = vec[i].size();
+			if(len == 0)
+				continue;
+			double r=0,g=0,b=0;
+			int x=0,y=0;
+			for(int j=0;j<len;j++)
+			{
+				int posX = vec[i][j].x;
+				int posY = vec[i][j].y;
+				int pos = posX * height + posY;
+				r+=lab[0][pos];
+				g+=lab[1][pos];
+				b+=lab[2][pos];
+				x+=posX;
+				y+=posY;
+			}
+			k_tags[i].r = r / len;
+			k_tags[i].g = g / len;
+			k_tags[i].b = b / len;
+			k_tags[i].x = x / len;
+			k_tags[i].y = y / len;
+		}
+	}
+	for(int i = 0 ; i < k ;i++)
+	{
+		int len = vec[i].size();
+		for(int j = 0 ; j < len ; j++)
+		{
+			fenClass_c[vec[i][j].x* height +vec[i][j].y] = i; 
+		}
+	}
+}
+
+void KMeans_Core_(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k,double M)
+
+{
+	int sz = width * height;
+	int S = sqrt(1.0 * sz / k)+0.5;
+	int MaxTime = S;
+	vector<vector<double>> k_tags(5,vector<double>(k));
+	vector<int>c_num(k);
+	while(MaxTime --)
+	{
+		for(int i = 0 ; i < 5 ; i++)
+		{
+			ZeroMemory(&k_tags[i][0],sizeof(double)*k);
+		}
+		ZeroMemory(&c_num[0],sizeof(int)*k);
+		for(int i = 0 ;i < width ;i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				int c = fenClass_c[pos];
+				k_tags[0][c]+= lab[0][pos];
+				k_tags[1][c]+= lab[1][pos];
+				k_tags[2][c]+= lab[2][pos];
+				k_tags[3][c]+= i;
+				k_tags[4][c]+= j;
+				c_num[c]++;
+			}
+		}
+		for(int i = 0 ; i < k ;i ++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			k_tags[0][i]/=c_num[i];
+			k_tags[1][i]/=c_num[i];
+			k_tags[2][i]/=c_num[i];
+			k_tags[3][i]/=c_num[i];
+			k_tags[4][i]/=c_num[i];
+		}
+		double sub[5]={0};
+		for(int i = 0;i<width ; i++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				double MinDis = INFF;
+				int c=0;
+				for(int w = 0 ; w < k ; w ++)
+				{
+					sub[0] = lab[0][pos] - k_tags[0][w];
+					sub[1] = lab[1][pos] - k_tags[1][w];
+					sub[2] = lab[2][pos] - k_tags[2][w];
+					sub[3] = i - k_tags[3][w];
+					sub[4] = j - k_tags[4][w];
+					double dis = sqrt(sub[0]*sub[0] + sub[1]*sub[1] + sub[2]*sub[2] + M*sub[3]*sub[3]+ M*sub[4]*sub[4]);
+					if(dis < MinDis)
+					{
+						MinDis = dis;
+						c = w;
+					}
+				}
+				fenClass_c[pos] = c;
+			}
+		}
+	}
+}
 void ICM_Core(const vector<vector<float>> &lab,
 				vector<int> &fenClass_c,
 				int width,
 				int height,
 				int &k)
 {
-	double T = 1.5;
 	double bate = 1.5;
 	int sz = width * height;
+	int MaxTime = 100;
 	int S = sqrt(sz / k)+0.5;
 	double powpi = pow(2*Pi,LABEL_NUM/2.0);
 	vector<vector<double>> E(k,vector<double>(LABEL_NUM,0));
@@ -2421,20 +2780,20 @@ void ICM_Core(const vector<vector<float>> &lab,
 	vector<double>t(LABEL_NUM);
 	vector<double>d(LABEL_NUM2);
 	vector<int> fenClass_t(sz);
-	vector<bool> fenClass_is(k);
 	vector<double> ans(1);
 	
 	MatrixQuick mat(LABEL_NUM);
-#ifdef LABEL3
-	vector<vector<double>> xy(k,vector<double>(2));
-#endif
-	int Max_Time = S * 2;
+	int Max_Time = S*2;
+	if(Max_Time > MaxTime)
+		Max_Time = MaxTime;
 	int Move8[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
 	vector<int> num(k,0);
 	vector<double> P(k);
 	vector<double> tP(k);
 	vector<double> dv(k);
 	vector<double> sub(LABEL_NUM);
+	vector<vector<double>> endPi(k,vector<double>(sz));
+	vector<double>sumPi(sz,0);
 	int s_8[8];
 	int spos = 0;
 	while(Max_Time -- )
@@ -2446,9 +2805,6 @@ void ICM_Core(const vector<vector<float>> &lab,
 			ZeroMemory(&E[i][0],sizeof(double)*LABEL_NUM);
 			ZeroMemory(&D[i][0],sizeof(double)*LABEL_NUM2);
 		}
-#ifdef LAEBL3
-		ZeroMemory(&xy[0],sizeof(double) * k);
-#endif
 		//求每类样本和
 		for(int i = 0 ; i < width ; i ++)
 		{
@@ -2456,18 +2812,15 @@ void ICM_Core(const vector<vector<float>> &lab,
 			{
 				int pos = i * height + j;
 				int c = fenClass_c[pos];
+				c_num[c] ++;
 				E[c][0] += lab[0][pos];
 				E[c][1] += lab[1][pos];
 				E[c][2] += lab[2][pos];
-#ifdef LABEL3
-		xy[c][0]+=i;
-		xy[c][1]+=j;
-#endif
-	#ifdef LABEL5
+		#ifdef LABEL5
 				E[c][3] += i;
 				E[c][4] += j;
-	#endif
-				c_num[c] ++;
+		#endif
+				
 			}
 		}
 		//求均值，即期望
@@ -2478,10 +2831,6 @@ void ICM_Core(const vector<vector<float>> &lab,
 			E[i][0] /= c_num[i];
 			E[i][1] /= c_num[i];
 			E[i][2] /= c_num[i];
-#ifdef LABEL3
-			xy[i][0] /= c_num[i];
-			xy[i][1] /= c_num[i];
-#endif
 	#ifdef LABEL5
 			E[i][3] /= c_num[i];
 			E[i][4] /= c_num[i];
@@ -2522,27 +2871,27 @@ void ICM_Core(const vector<vector<float>> &lab,
 		memcpy_s(&fenClass_t[0],sizeof(int) * sz,&fenClass_c[0],sizeof(int) * sz);
 		for(int i =0 ; i < k ; i ++)
 		{
-			
 			if(c_num[i] == 0)
 			{
 				continue;
 			}
-			fenClass_is[i] = 0;	
-			dv[i] = abs(mat.Det(&D[i][0]));
-			if(dv[i] < 1e-10)
+			dv[i] = fabs(mat.Det(&D[i][0]));
+			if(dv[i] < 1e-20)
 			{
-				/*for(int ii=0;ii<LABEL_NUM;ii++)
+				for(int ii=0;ii<LABEL_NUM;ii++)
 				{
 					D[i][ii*LABEL_NUM + ii]+=1e-4;
 				}
-				mat.Inverse(&D[i][0],&D_[i][0]);
-				dv[i] = abs(mat.Det(&D[i][0]));*/
-				fenClass_is[i] = 1;
-				//dv[i] = 0;
-			}else{
-				mat.Inverse(&D[i][0],&D_[i][0]);
-			}
+				dv[i] = fabs(mat.Det(&D[i][0]));
 			
+			}
+			mat.Inverse(&D[i][0],&D_[i][0]);
+		}
+		for(int i = 0 ; i < k ; i++)
+		{
+			if(c_num[i] == 0)
+				continue;
+			dv[i] = sqrt(dv[i]);
 		}
 		for(int i = 0 ; i < width ; i ++)
 		{
@@ -2554,8 +2903,6 @@ void ICM_Core(const vector<vector<float>> &lab,
 				{
 					continue;
 				}
-				if(fenClass_is[c])
-					continue;
 				//存储pos周围的八邻域类情况
 				for(int w = 0 ; w < 8 ; w++)
 				{
@@ -2575,61 +2922,46 @@ void ICM_Core(const vector<vector<float>> &lab,
 				}
 				
 				int tc = c;
-				if(spos > 1 ){
-					double z = 0;
-					for(int w = 0 ; w < spos ; w ++)
-					{
-						int tnum = num[s_8[w]];
-						double b = tnum*bate;
-						P[s_8[w]] = exp(b);//exp(-1.0 * b / T);
-						//z += tP[s_8[w]];
-					}
-					double other=1;
-					//z+= k - spos;
-					/*other = 1 / z;
-					for(int w = 0 ; w < spos ; w ++)
-					{
-						P[s_8[w]] = tP[s_8[w]] / z;
-					}*/
 				
-					double max_pi = -INFI;
-					for(int w = 0 ; w < k ; w ++)
-					{
-						if(dv[w] == 0)
-						{
-							continue;
-						}
-						double preP = other;
-						if(num[w])
-							preP = P[w];
-	#ifdef LABEL5
-						double MaxX = E[w][3]+S;
-						double MinX = E[w][3]-S;
-						double MaxY = E[w][4]+S;
-						double MinY = E[w][4]-S;
-						sub[3] = i - E[w][3];
-						sub[4] = j - E[w][4];
-	#endif
-	#ifdef LABEL3
-						double MaxX = xy[w][0]+S;
-						double MinX = xy[w][0]-S;
-						double MaxY = xy[w][1]+S;
-						double MinY = xy[w][1]-S;
-	#endif
-						if(i > MaxX || i < MinX || j > MaxY || j < MinY)
-							continue;
-						sub[0] = lab[0][pos] - E[w][0];
-						sub[1] = lab[1][pos] - E[w][1];
-						sub[2] = lab[2][pos] - E[w][2];
+				//double z = 0;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					int tnum = num[s_8[w]];
+					double b = tnum*bate;
+					P[s_8[w]] = exp(b);
+					//z += tP[s_8[w]];
+				}
+				double other=1;
+				/*z+= k - spos;
+				other = 1 / z;
+				for(int w = 0 ; w < spos ; w ++)
+				{
+					P[s_8[w]] = tP[s_8[w]] / z;
+				}*/
+				
+				double max_pi = -INFI;
+				for(int w = 0 ; w < k ; w ++)
+				{
+					if(c_num[w] == 0)
+						continue;
+					double preP = other;
+					if(num[w])
+						preP = P[w];
+					sub[0] = lab[0][pos] - E[w][0];
+					sub[1] = lab[1][pos] - E[w][1];
+					sub[2] = lab[2][pos] - E[w][2];
+#ifdef LABEL5
+					sub[3] = i - E[w][3];
+					sub[4] = j - E[w][4];
+#endif
 
-						mat.Mul(&sub[0],&D_[w][0],1,LABEL_NUM,LABEL_NUM,&t[0]);
-						mat.Mul(&t[0],&sub[0],1,LABEL_NUM,1,&ans[0]);
-						double pi = (preP / sqrt(dv[w]) * exp(-0.5 * ans[0]));  
-						if(pi > max_pi)
-						{
-							tc = w;
-							max_pi = pi;
-						}
+					mat.Mul(&sub[0],&D_[w][0],1,LABEL_NUM,LABEL_NUM,&t[0]);
+					mat.Mul(&t[0],&sub[0],1,LABEL_NUM,1,&ans[0]);
+					double pi = ( preP / dv[w] * exp(-0.5 * ans[0]));
+					if(pi > max_pi)
+					{
+						tc = w;
+						max_pi = pi;
 					}
 				}
 				fenClass_c[pos] = tc;
@@ -2640,8 +2972,261 @@ void ICM_Core(const vector<vector<float>> &lab,
 				spos = 0;
 			}
 		}
+	}	
+}
+/*
+设：
+E[i]:第i类的均值
+D[i]:第i类的方差
+P[i][j]:点j属于i的概率
+Q[i][j]:对于第j个点，第i类的先验概率
+Nk[i]:第i类的点数
+S[i]：第i类的样本空间
+sz:像素点总个数
+x[i]:第i个样本点
+Num[i][j]:第i个点邻域j类的个数
+有：
+E[k] = 1/Nk[k] * sum(x[i]∈s[k])
+D[k] = 1/Nk[k] * sum( (x[i] - E[k])^T * (x[i] - E[k]))
+Q[k][j] = e^(Num[i][k]*β) / sum(e^(Num[j][k]*β))
+P[k][j] = Q[j][k] * N(x[j],E[k],D[k])
+*/
+
+void ICM_Core_(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k)
+{
+
+	vector<int>color(k);
+	RGBQUAD colorTab[256];
+	for(int i =0 ; i < 256 ; i++)
+	colorTab[i].rgbBlue = colorTab[i].rgbGreen = colorTab[i].rgbRed = i;
+	CImage img;
+	img.Create(width,height,8);
+	img.SetColorTable(0,256,colorTab);
+	byte *blt = (byte *)img.GetBits();
+	int plt = img.GetPitch();
+	int path_num=0;
+	//
+	int sz = width * height;
+	int MaxTime = 100;
+	vector<vector<double>> E(k,vector<double>(LABEL_NUM));
+	vector<vector<double>> D(k,vector<double>(LABEL_NUM2));
+	vector<vector<double>> D_(k,vector<double>(LABEL_NUM2));
+	vector<double> det(k);
+	vector<double> D2(LABEL_NUM2);
+	vector<double> D1(LABEL_NUM);
+	vector<double> Dt(LABEL_NUM);
+	vector<int> Nk(k);
+	MatrixQuick mat(LABEL_NUM);
+	vector<int>fenClass_t(sz);
+	int S = sqrt(1.0 * sz / k) + 0.5;
+	int Max_Time = S;
+	if(Max_Time > MaxTime)
+		Max_Time = MaxTime;
+	int Move[][2] = {0,1,0,-1,1,0,-1,0,1,1,1,-1,-1,1,-1,-1};
+	int S8[8];
+	vector<int>c_num(k,0);
+	vector<double>Q(k);
+	vector<double>Ans(1);
+	const double bate = 1.5;
+	srand(time(NULL));
+	for(int i = 0 ; i < k;i++)
+	{
+		color[i] = rand() % 255;
 	}
-	
+	while(Max_Time --)
+	{
+		ZeroMemory(&(Nk[0]),sizeof(int) * k);
+		for(int i = 0 ; i < k ; i ++)
+		{
+			ZeroMemory(&(E[i][0]),sizeof(double) * LABEL_NUM);
+			ZeroMemory(&(D[i][0]),sizeof(double) * LABEL_NUM2);
+		}
+		memcpy_s(&fenClass_t[0],sizeof(int)*sz,&fenClass_c[0],sizeof(int)*sz);
+		//求期望
+		for(int i = 0 ; i < sz ; i ++)
+		{
+			int c = fenClass_c[i];
+			E[c][0] += lab[0][i];
+			E[c][1] += lab[1][i];
+			E[c][2] += lab[2][i];
+			Nk[c] ++;
+#ifdef LABEL5
+			E[c][3] += i / height;
+			E[c][4] += i % height;
+#endif
+
+		}
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(Nk[i] == 0)
+				continue;
+			E[i][0] /= Nk[i];
+			E[i][1] /= Nk[i];
+			E[i][2] /= Nk[i];
+#ifdef LABEL5
+			E[i][3] /= Nk[i];
+			E[i][4] /= Nk[i];
+#endif
+		}
+		//求期望结束
+		//求方差
+		for(int i = 0 ; i < sz ; i ++)
+		{
+			int c = fenClass_c[i];
+			D1[0] = lab[0][i] - E[c][0];
+			D1[1] = lab[1][i] - E[c][1];
+			D1[2] = lab[2][i] - E[c][2];
+#ifdef LABEL5
+			D1[3] = i / height - E[c][3];
+			D1[4] = i % height - E[c][4];
+#endif
+			mat.Mul(&D1[0],&D1[0],LABEL_NUM,1,LABEL_NUM,&D2[0]);
+			for(int j = 0 ; j < LABEL_NUM2 ; j++)
+			{
+				D[c][j] += D2[j];
+			}
+		}
+		for(int i = 0 ; i < k ; i ++)
+		{
+			if(Nk[i] == 0)
+				continue;
+			for(int j = 0 ; j < LABEL_NUM2 ; j++)
+			{
+				D[i][j] /= Nk[i];
+			}
+		}
+		//求方差结束
+		//求方差的逆矩阵
+		for(int i = 0 ; i < k ;i ++)
+		{
+			if(Nk[i] == 0)
+				continue;
+			det[i] = fabs(mat.Det(&D[i][0]));
+			if(det[i] < 1e-20)
+			{
+				for(int j = 0 ; j < LABEL_NUM; j ++)
+				{
+					D[i][j*LABEL_NUM + j] += 1e-4;
+				}
+				det[i] = fabs(mat.Det(&D[i][0]));
+			}
+			mat.Inverse(&D[i][0],&D_[i][0]);
+		}
+		for(int t = 0 ; t < k ; t ++)
+		{
+			if(Nk[t] == 0)
+				continue;
+			det[t] = sqrt(det[t]);
+		}
+		//方差逆矩阵结束
+		//求后验概率并重新划分类
+		for(int i = 0 ; i < width ; i++)
+		{
+			for(int j = 0 ; j < height ;j++)
+			{
+				int pos = i * height + j;
+			//求先验概率
+				int cou = 0;
+				//统计八邻域每个类的数目
+				for(int w = 0 ; w < 8 ; w++)
+				{
+					int nx = i + Move[w][0];
+					int ny = j + Move[w][1];
+					
+					if(nx < 0 || ny < 0 || nx >= width || ny >= height)
+						continue;
+					int npos = i * height + j;
+					int c = fenClass_t[npos];
+					if(c_num[c] == 0)
+					{
+						S8[cou] = c;
+						cou ++;
+					}
+					c_num[c] ++;
+				}
+				//求先验概率
+				//double z = 0;
+				
+				for(int t = 0 ; t < cou ; t++)
+				{
+					int c = S8[t];
+					int num = c_num[c];
+					Q[c] = exp(num * bate);
+					//z += Q[c];
+				}
+				double other = 1;
+				/*z += k - cou;
+				other = 1 / z;
+				for(int t = 0 ; t < cou ;t++)
+				{
+					int c = S8[t]; 
+					Q[c] /= z;
+				}*/
+				/*for(int t = 0 ; t < k ; t ++)
+				{
+					Q[t] = exp(c_num[t]*bate);
+				}*/
+				//求后验概率
+				int tc = fenClass_t[pos];
+				double MaxPi = -1;
+				int ansC = tc;
+				double P;
+				double ei ;
+				double de ;
+				double pi;
+				
+				for(int t = 0 ; t < k ;t ++)
+				{
+					if(Nk[t] == 0)
+						continue;
+					P = other;
+					if(c_num[t])
+						P = Q[t];
+					D1[0] = lab[0][pos] - E[t][0];
+					D1[1] = lab[1][pos] - E[t][1];
+					D1[2] = lab[2][pos] - E[t][2];
+#ifdef LABEL5
+					D1[3] = i - E[t][3];
+					D1[4] = j - E[t][4];
+#endif
+					
+					mat.Mul(&D1[0],&D_[t][0],1,LABEL_NUM,LABEL_NUM,&Dt[0]);
+					mat.Mul(&Dt[0],&D1[0],1,LABEL_NUM,1,&Ans[0]);
+					ei = exp(-0.5*Ans[0]);
+					de = det[t];
+					pi = P / de * ei;
+					if(pi > MaxPi)
+					{
+						ansC = t;
+						MaxPi = pi;
+					}			
+				}
+				
+				fenClass_c[pos] = ansC;
+				
+				for(int t = 0; t < cou;t++)
+				{
+					c_num[S8[t]] = 0;
+				}
+			}
+		}
+		//求后验概率结束
+		for(int i = 0 ; i < width ; i ++)
+		{
+			for(int j = 0 ; j < height ; j++)
+			{
+				int pos = i * height + j;
+				*(blt + j*plt + i) = color[fenClass_c[pos]];
+			}
+		}
+		CString str;
+		str.Format("img/%d.jpg",path_num++);
+		img.Save(str);
+	}
 }
 
 void ICM_CoreUseEigen(const vector<vector<float>> &lab,
@@ -3060,7 +3645,26 @@ void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k)
 	}
 	
 }
-
+void init_n_2_k(vector<int> &fenClass_c,int width,int height,int &k)
+{
+	int sz = width * height;
+	fenClass_c = vector<int>(sz);
+	int S = sqrt(1.0 * sz / k)+0.5;
+	int wNum = width / S + ((width%S)?1:0);
+	int hNum = height / S+((height%S)?1:0);
+	k = wNum * hNum;
+	for(int i = 0 ;i <width ; i ++)
+	{
+		for(int j = 0 ; j < height ; j++)
+		{
+			int row = i / S;
+			int col = j / S;
+			int c = row * hNum + col;
+			int pos = i *height +j;
+			fenClass_c[pos] = c;
+		}
+	}
+}
 void LogDebug(vector<vector<double>>&pi,int width,int height,int k,CString name,int t)
 {
 	
@@ -3153,4 +3757,102 @@ void DrawBorderWidthAvgColor(CImage &des,vector<int> &fenClass_c,int width,int h
 void LogDebug(string str)
 {
 	logs.Debug(str);
+}
+
+void SaveImg(vector<int> & fenClass_c,CImage &img,int width,int height,CString path)
+{
+	static int num = 1;
+	CString relPath;
+	DrawBorder1(img,fenClass_c,width,height);
+	
+	CString str;
+	str.Format("%d",num);
+	relPath = path+str+".jpg";
+	
+	img.Save(relPath.GetBuffer(relPath.GetLength()));
+	num++;
+}
+
+bool ImageCopy(const CImage &srcImage, CImage &destImage)
+{
+    int i;//循环变量
+    if (srcImage.IsNull())
+        return FALSE;
+    //源图像参数
+    BYTE* srcPtr = (BYTE*)srcImage.GetBits();
+    int srcBitsCount = srcImage.GetBPP();
+    int srcWidth = srcImage.GetWidth();
+    int srcHeight = srcImage.GetHeight();
+    int srcPitch = srcImage.GetPitch();
+    //销毁原有图像
+    if (!destImage.IsNull())
+    {
+        destImage.Destroy();
+    }
+    //创建CImage类新图像并分配内存
+    if (srcBitsCount == 32)   //支持alpha通道
+    {
+        destImage.Create(srcWidth, srcHeight, srcBitsCount, 1);
+    }
+    else
+    {
+        destImage.Create(srcWidth, srcHeight, srcBitsCount, 0);
+    }
+    //加载调色板
+    if (srcBitsCount <= 8 && srcImage.IsIndexed())//需要调色板
+    {
+        RGBQUAD pal[256];
+        int nColors = srcImage.GetMaxColorTableEntries();
+        if (nColors>0)
+        {
+            srcImage.GetColorTable(0, nColors, pal);
+            destImage.SetColorTable(0, nColors, pal);//复制调色板程序
+        }
+    }
+    //目标图像参数
+    BYTE *destPtr = (BYTE*)destImage.GetBits();
+    int destPitch = destImage.GetPitch();
+    //复制图像数据
+    for (i = 0; i<srcHeight; i++)
+    {
+        memcpy(destPtr + i*destPitch, srcPtr + i*srcPitch, abs(srcPitch));
+    }
+
+    return TRUE;
+}
+int ReadInt(FILE *&file,int &val){
+	return fread_s(&val,sizeof(val),sizeof(val),1,file);
+}
+int ReadDouble(FILE *&file,double &val)
+{
+	return fread_s(&val,sizeof(val),sizeof(val),1,file);
+}
+int ReadString(FILE *&file,char *buf,int bufLen)
+{
+	int len;
+	ReadInt(file,len);
+	return fread_s(buf,bufLen,len,1,file);
+}
+int WriteInt(FILE *&file,int &val){
+	return fwrite(&val,sizeof(val),1,file);
+}
+int WriteDouble(FILE *&file,double &val)
+{
+	return fwrite(&val,sizeof(val),1,file);
+}
+int WriteString(FILE *&file,char *buf)
+{
+	int len = strlen(buf)+1;
+	WriteInt(file,len);
+	return fwrite(buf,len,1,file);
+}
+void init_rand_2_k(vector<int> &fenClass_c,int width,int height,int &k)
+{
+	int sz = width * height;
+	fenClass_c = vector<int>(sz);
+	srand(time(NULL));
+	for(int i =0;i<sz;i++)
+	{
+		fenClass_c[i] = rand()%k;
+	}
 }

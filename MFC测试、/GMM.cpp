@@ -52,3 +52,19 @@ int GMM1(CImage &res,CImage &des,int k,double M)
 	DrawBorder(des,fenClass_c);
 	return 0;
 }
+int GMM2(vector<vector<float>> &lab,vector<int> &fenClass_c,int width,int height,int &k,double M)
+{
+	/*vector<double>grad;
+	GetImageGrad(lab,grad,width,height);
+	SLIC_Core(lab,grad,fenClass_c,width,height,k,M);
+	MergeClassByColor(lab,fenClass_c,width,height,k);
+	delete_empty_calss(fenClass_c,width,height,k);*/
+	//n_avg_2_k_(fenClass_c,width,height,k);
+	init_n_2_k(fenClass_c,width,height,k);
+	//init_rand_2_k(fenClass_c,width,height,k);
+	KMeans_Core_(lab,fenClass_c,width,height,k,M);
+	GMM_Core_(lab,fenClass_c,width,height,k);
+	//MergeClassByColor(lab,fenClass_c,width,height,k);
+	//delete_empty_calss(fenClass_c,width,height,k);
+	return 0;
+}

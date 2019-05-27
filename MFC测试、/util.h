@@ -21,7 +21,6 @@ public:
 	}
 };
 
-
 struct TagEx
 {
 	double r,g,b;
@@ -535,6 +534,11 @@ void GMM_Core(	const vector<vector<float>> &lab,
 				int width,
 				int height,
 				int &k);
+void GMM_Core_(	const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k);
 void GMM_Core1(	const vector<vector<vector<float>>> &lab,
 				vector<vector<int>> &fenClass_c,
 				vector<int> & point_num,
@@ -547,6 +551,18 @@ void KMeans_Core(	const vector<vector<vector<float>>> &lab,
 					vector<vector<int>> &fenClass_c,
 					int &k,
 					double M);
+void KMeans_Core(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k,double M)
+;
+void KMeans_Core_(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k,double M)
+;
 double GetAngle(double ax,double ay,double bx,double by);
 void ICM_Core(const vector<vector<float>> &lab,
 				vector<int> &fenClass_c,
@@ -558,6 +574,13 @@ void ICM_CoreUseEigen(const vector<vector<float>> &lab,
 				int width,
 				int height,
 				int &k);
+void ICM_Core_(const vector<vector<float>> &lab,
+				vector<int> &fenClass_c,
+				int width,
+				int height,
+				int &k);
+//void ICM_Core_(vector<vector<float>> &lab,vector<int> &fenClass_c,CPoint sPos,CPoint ePos,int width,int height,int &k);
+
 void Avg_n2(vector<vector<float>> & lab,int width,int height,int n);
 
 void delete_empty_calss(vector<int> &fenClass_c,int width,int height,int &k);
@@ -566,6 +589,20 @@ void n_avg_2_k(vector<int> &fenClass_c,int width,int height,int &k);
 
 void n_avg_2_k_(vector<int> &fenClass_c,int width,int height,int &k);
 
+void init_n_2_k(vector<int> &fenClass_c,int width,int height,int &k);
+
+void init_rand_2_k(vector<int> &fenClass_c,int width,int height,int &k);
+
 void LogDebug(vector<vector<double>>&,int width,int height,int k,CString name,int t);
 
 void LogDebug(CString str);
+
+void SaveImg(vector<int> & fenClass_c,CImage &img,int width,int height,CString path);
+bool ImageCopy(const CImage &srcImage, CImage &destImage);
+
+int ReadInt(FILE *&file,int &val);
+int ReadDouble(FILE *&file,double &val);
+int ReadString(FILE *&file,char *buf,int bufLen);
+int WriteInt(FILE *&file,int &val);
+int WriteDouble(FILE *&file,double &val);
+int WriteString(FILE *&file,char *buf);

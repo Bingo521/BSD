@@ -625,13 +625,34 @@ void KMeans(CImage &res,CImage &des,int k,double rate,int step,double sublim0)
 
 void KMeans1(CImage &res,CImage &des,int k,double rate)
 {
-	des = res;
-	vector<vector<vector<float>>> lab;
-	vector<vector<double>> grad;
-	vector<vector<int>> fenClass_c;
+	//des = res;
+	//vector<vector<vector<float>>> lab;
+	//vector<vector<double>> grad;
+	//vector<vector<int>> fenClass_c;
+	//Image2Lab(des,lab);
+	//GetImageGrad(lab,grad);
+	//KMeans_Core(lab,grad,fenClass_c,k,rate);
+	////MergeClassByColor(lab,fenClass_c,k);
+	//DrawBorder1(des,fenClass_c);
+	des  = res;
+	int image_bpp = des.GetBPP();
+	int width = des.GetWidth();
+	int height = des.GetHeight();
+	vector<vector<float>> lab;
+	vector<double>grad;
+	vector<int>fenClass_c;
 	Image2Lab(des,lab);
-	GetImageGrad(lab,grad);
-	KMeans_Core(lab,grad,fenClass_c,k,rate);
-	//MergeClassByColor(lab,fenClass_c,k);
-	DrawBorder1(des,fenClass_c);
+	//Avg_n2(lab,width,height,1);
+	KMeans_Core(lab,fenClass_c,width,height,k,rate);
+	MergeClassByColor(lab,fenClass_c,width,height,k);
+	DrawBorder1(des,fenClass_c,width,height);
+}
+
+int KMeans(vector<vector<float>> &lab,vector<int> &fenClass_c,int width,int height,int &k,double M)
+{
+	//init_rand_2_k(fenClass_c,width,height,k);
+	init_n_2_k(fenClass_c,width,height,k);
+	KMeans_Core_(lab,fenClass_c,width,height,k,M);
+	MergeClassByColor(lab,fenClass_c,width,height,k);
+	return 0;
 }
